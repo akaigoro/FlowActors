@@ -1,0 +1,8 @@
+.settings
+.idea/
+*.iml
+*/*.iml
+*/doc/*
+target/
+*/bin/*
+javadoc/
