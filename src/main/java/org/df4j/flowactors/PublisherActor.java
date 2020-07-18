@@ -11,6 +11,7 @@ public abstract class PublisherActor<T> extends Actor implements Flow.Publisher<
             T res = atNext();
             if (res!=null) {
                 outPort.onNext(res);
+                restart();
             } else {
                 outPort.onComplete();
             }

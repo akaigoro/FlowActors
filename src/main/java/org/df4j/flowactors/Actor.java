@@ -12,10 +12,11 @@ public abstract class Actor {
     private Port controlPort = new Port();
 
     private void fire() {
+        controlPort.block();
         excecutor.execute(this::run);
     }
 
-    protected synchronized void start() {
+    public synchronized void start() {
         if (state != State.CREATED) {
             throw new IllegalStateException();
         }
@@ -88,13 +89,16 @@ public abstract class Actor {
 
 
     class OutPort<T> extends Port implements Flow.Publisher<T>, Flow.Subscription {
-        Flow.Subscriber<T> subscriber;
+        Flow.Subscriber<? super T> subscriber;
         int requested=0;
 
         @Override
-        public void subscribe(Flow.Subscriber subscriber) {
+        public void subscribe(Flow.Subscriber<? super T> subscriber) {
+            if (subscriber == null) {
+                throw new NullPointerException();
+            }
             if (this.subscriber != null) {
-                throw new IllegalStateException();
+                subscriber.onError(new IllegalStateException());
             }
             this.subscriber = subscriber;
             subscriber.onSubscribe(this);
@@ -103,10 +107,11 @@ public abstract class Actor {
         @Override
         public synchronized void request(long n) {
             if (subscriber == null) {
-                throw new IllegalStateException();
+                return;
             }
             if (n <= 0) {
-                subscriber.onError(new IllegalStateException());
+                subscriber.onError(new IllegalArgumentException());
+                return;
             }
             boolean doUnBlock = requested==0;
             requested+=n;
@@ -120,14 +125,16 @@ public abstract class Actor {
             if (subscriber == null) {
                 return;
             }
-            subscriber.onComplete();
             subscriber = null;
         }
 
         public void onNext(T item) {
             synchronized (Actor.this) {
-                if (subscriber == null || requested == 0) {
-                    throw new IllegalStateException();
+                if (subscriber == null) {
+                    return;
+                }
+                if (requested == 0) {
+                    subscriber.onError(new IllegalStateException());
                 }
                 requested--;
                 if (requested == 0) {
@@ -166,6 +173,7 @@ public abstract class Actor {
         public void onSubscribe(Flow.Subscription subscription) {
 
             if (this.subscription != null) {
+                subscription.cancel();
                 return;
             }
             this.subscription = subscription;
@@ -178,6 +186,9 @@ public abstract class Actor {
                 if (completed) {
                     return;
                 }
+                if (item == null) {
+                    throw new NullPointerException();
+                }
                 this.item = item;
                 unBlock();
             }
@@ -188,6 +199,9 @@ public abstract class Actor {
             synchronized (Actor.this) {
                 if (completed) {
                     return;
+                }
+                if (throwable == null) {
+                    throw new NullPointerException();
                 }
                 completed = true;
                 completionException = throwable;

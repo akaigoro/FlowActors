@@ -10,9 +10,14 @@ public class ProducerActor extends PublisherActor<Long> {
     final int delay;
     long cnt;
 
-    public ProducerActor(int cnt, int delay) {
+    public ProducerActor(long cnt, int delay) {
         this.cnt = cnt;
         this.delay = delay;
+    }
+
+    public ProducerActor(long cnt) {
+        this.cnt = cnt;
+        this.delay = 0;
     }
 
     @Override

@@ -42,15 +42,15 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.testng</groupId>
-            <artifactId>testng</artifactId>
-            <version>6.14.3</version>
+            <groupId>org.reactivestreams</groupId>
+            <artifactId>reactive-streams-tck-flow</artifactId>
+            <version>1.0.2</version>
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <version>RELEASE</version>
+            <groupId>org.testng</groupId>
+            <artifactId>testng</artifactId>
+            <version>6.14.3</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

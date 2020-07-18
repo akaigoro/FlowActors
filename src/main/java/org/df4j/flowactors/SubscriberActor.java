@@ -46,6 +46,6 @@ public abstract class SubscriberActor<T> extends Actor implements Flow.Subscribe
     }
 
     protected abstract void atNext(T item) throws Throwable;
-    protected void atComplete() throws Throwable {}
-    protected void atError(Throwable throwable) throws Throwable {}
+    protected void atComplete() {}
+    protected void atError(Throwable throwable) {}
 }
