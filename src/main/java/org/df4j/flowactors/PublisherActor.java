@@ -6,6 +6,13 @@ public abstract class PublisherActor<T> extends Actor implements Flow.Publisher<
     protected OutPort<T> outPort = new OutPort<>();
 
     @Override
+    public void subscribe(Flow.Subscriber<? super T> subscriber) {
+        outPort.subscribe(subscriber);
+    }
+
+    protected abstract T atNext()  throws Throwable;
+
+    @Override
     protected void run() {
         try {
             T res = atNext();
@@ -19,11 +26,4 @@ public abstract class PublisherActor<T> extends Actor implements Flow.Publisher<
             outPort.onError(throwable);
         }
     }
-
-    @Override
-    public void subscribe(Flow.Subscriber<? super T> subscriber) {
-        outPort.subscribe(subscriber);
-    }
-
-    protected abstract T atNext()  throws Throwable;
 }

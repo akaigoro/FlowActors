@@ -2,8 +2,9 @@ package org.df4j.flowactors;
 
 import java.util.concurrent.Flow;
 
-public abstract class SubscriberActor<T> extends Actor implements Flow.Subscriber<T> {
+public abstract class ProcessorActor<T, R> extends Actor implements Flow.Processor<T, R> {
     protected InPort<T> inPort = new InPort<>();
+    protected OutPort<R> outPort = new OutPort<>();
 
     @Override
     public void onSubscribe(Flow.Subscription subscription) {
@@ -25,17 +26,32 @@ public abstract class SubscriberActor<T> extends Actor implements Flow.Subscribe
         inPort.onComplete();
     }
 
-    protected abstract void atNext(T item) throws Throwable;
-    protected void atComplete() {}
-    protected void atError(Throwable throwable) {}
+    protected void atComplete() {
+        outPort.onComplete();
+    }
+    protected void atError(Throwable throwable) {
+        outPort.onError(throwable);
+    }
+
+    @Override
+    public void subscribe(Flow.Subscriber<? super R> subscriber) {
+        outPort.subscribe(subscriber);
+    }
+
+    protected abstract R atNext(T item)  throws Throwable;
 
     @Override
     protected void run() {
         try {
             if (!inPort.isCompleted()) {
                 T item = inPort.remove();
-                atNext(item);
-                restart();
+                R res= atNext(item);
+                if (res!=null) {
+                    outPort.onNext(res);
+                    restart();
+                } else {
+                    outPort.onComplete();
+                }
             } else {
                 Throwable thr = inPort.getCompletionException();
                 if (thr == null) {
