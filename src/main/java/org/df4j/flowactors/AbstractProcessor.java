@@ -2,9 +2,14 @@ package org.df4j.flowactors;
 
 import java.util.concurrent.Flow;
 
-public abstract class ProcessorActor<T, R> extends Actor implements Flow.Processor<T, R> {
-    protected InPort<T> inPort = new InPort<>();
-    protected OutPort<R> outPort = new OutPort<>();
+/**
+ * To make concrete processor, the method {@link AbstractProcessor##atNext(Object)} need to be implemented
+ * @param <T> type of processed data
+ * @param <R> type of produced data
+ */
+public abstract class AbstractProcessor<T, R> extends Actor implements Flow.Processor<T, R> {
+    private InPort<T> inPort = new InPort<>();
+    private OutPort<R> outPort = new OutPort<>();
 
     @Override
     public void onSubscribe(Flow.Subscription subscription) {
@@ -38,8 +43,16 @@ public abstract class ProcessorActor<T, R> extends Actor implements Flow.Process
         outPort.subscribe(subscriber);
     }
 
+    /**
+     *
+     * @param item input data
+     * @return processed data
+     * @throws Throwable if something went wrong
+     */
     protected abstract R atNext(T item)  throws Throwable;
 
+    /** processes one data item
+     */
     @Override
     protected void run() {
         try {

@@ -1,7 +1,6 @@
 package org.df4j.reactivestreamstck;
 
-import org.df4j.flowactors.ConsumerActor;
-import org.reactivestreams.Subscriber;
+import org.df4j.flowactors.SubscriberActor;
 import org.reactivestreams.tck.TestEnvironment;
 
 import java.util.concurrent.Flow;
@@ -20,6 +19,6 @@ public class SubscriberBlackboxVerificationTest extends org.reactivestreams.tck.
 
     @Override
     public Flow.Subscriber<Long> createFlowSubscriber() {
-        return new ConsumerActor(0);
+        return new SubscriberActor(0);
     }
 }

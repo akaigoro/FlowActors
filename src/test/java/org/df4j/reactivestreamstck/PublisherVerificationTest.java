@@ -1,6 +1,6 @@
 package org.df4j.reactivestreamstck;
 
-import org.df4j.flowactors.ProducerActor;
+import org.df4j.flowactors.PublisherActor;
 import org.reactivestreams.tck.TestEnvironment;
 
 import java.util.concurrent.Flow;
@@ -14,7 +14,7 @@ public class PublisherVerificationTest extends org.reactivestreams.tck.flow.Flow
 
     @Override
     public Flow.Publisher<Long> createFlowPublisher(long elements) {
-        ProducerActor publisher = new ProducerActor(elements);
+        PublisherActor publisher = new PublisherActor(elements);
         publisher.start();
         return publisher;
     }
@@ -26,7 +26,7 @@ public class PublisherVerificationTest extends org.reactivestreams.tck.flow.Flow
         return publisher;
     }
 
-    private static class MyFailedPublisherActor extends ProducerActor {
+    private static class MyFailedPublisherActor extends PublisherActor {
 
         public MyFailedPublisherActor() {
             super(0);

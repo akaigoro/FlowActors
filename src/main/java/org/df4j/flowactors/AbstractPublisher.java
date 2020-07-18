@@ -2,8 +2,13 @@ package org.df4j.flowactors;
 
 import java.util.concurrent.Flow;
 
-public abstract class PublisherActor<T> extends Actor implements Flow.Publisher<T>{
-    protected OutPort<T> outPort = new OutPort<>();
+/**
+ * minimalistic {@link Flow.Publisher} implementation.
+ * Only one subscriber can subscribe.
+ * @param <T> type of produced data
+ */
+public abstract class AbstractPublisher<T> extends Actor implements Flow.Publisher<T>{
+    private OutPort<T> outPort = new OutPort<>();
 
     @Override
     public void subscribe(Flow.Subscriber<? super T> subscriber) {
@@ -12,6 +17,8 @@ public abstract class PublisherActor<T> extends Actor implements Flow.Publisher<
 
     protected abstract T atNext()  throws Throwable;
 
+    /** generates one data item
+     */
     @Override
     protected void run() {
         try {

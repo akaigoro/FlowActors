@@ -2,17 +2,19 @@ package org.df4j.flowactors;
 
 import java.util.logging.Logger;
 
-public class ConsumerActor extends SubscriberActor<Long> {
+public class SubscriberActor extends AbstractSubscriber<Long> {
     Logger logger = Logger.getLogger("consumer");
     final int delay;
 
-    public ConsumerActor(int delay) {
+    public SubscriberActor(int delay) {
         this.delay = delay;
     }
 
     @Override
     protected void atNext(Long item) {
-        logger.info("  got:"+item);
+        if (Math.abs(item) < 100 || item%10 == 0) {
+            logger.info("  got:"+item);
+        }
     }
 
     @Override

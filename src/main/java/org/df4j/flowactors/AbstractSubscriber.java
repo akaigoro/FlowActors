@@ -2,8 +2,8 @@ package org.df4j.flowactors;
 
 import java.util.concurrent.Flow;
 
-public abstract class SubscriberActor<T> extends Actor implements Flow.Subscriber<T> {
-    protected InPort<T> inPort = new InPort<>();
+public abstract class AbstractSubscriber<T> extends Actor implements Flow.Subscriber<T> {
+    private InPort<T> inPort = new InPort<>();
 
     @Override
     public void onSubscribe(Flow.Subscription subscription) {
@@ -27,8 +27,12 @@ public abstract class SubscriberActor<T> extends Actor implements Flow.Subscribe
 
     protected abstract void atNext(T item) throws Throwable;
     protected void atComplete() {}
-    protected void atError(Throwable throwable) {}
+    protected void atError(Throwable throwable) {
+        throwable.printStackTrace();
+    }
 
+    /** processes one data item
+     */
     @Override
     protected void run() {
         try {
