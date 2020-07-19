@@ -4,7 +4,7 @@ import java.util.concurrent.*;
 
 public abstract class Actor {
     private Executor excecutor = ForkJoinPool.commonPool();
-    private State state = State.CREATED;
+    protected State state = State.CREATED;
     private int blocked = 0;
     /**
      * blocked initially and when running.

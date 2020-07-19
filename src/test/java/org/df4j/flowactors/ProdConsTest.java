@@ -1,7 +1,7 @@
 package org.df4j.flowactors;
 
-import org.junit.Assert;
-import org.junit.Test;
+import static org.testng.Assert.assertTrue;
+import org.testng.annotations.Test;
 
 public class ProdConsTest {
 
@@ -11,8 +11,8 @@ public class ProdConsTest {
         prod.subscribe(cons);
         prod.start();
         cons.start();
-        cons.join(Math.max(delay1, delay2)*cnt+100);
-        Assert.assertTrue(cons.isCompleted());
+        cons.join(Math.max(delay1, delay2)*cnt+300);
+        assertTrue(cons.isCompleted());
     }
 
     @Test
