@@ -7,9 +7,8 @@ import java.util.concurrent.Flow;
  * @param <T> type of processed data
  * @param <R> type of produced data
  */
-public abstract class AbstractProcessor<T, R> extends Actor implements Flow.Processor<T, R> {
-    private InPort<T> inPort = new InPort<>();
-    private OutPort<R> outPort = new OutPort<>();
+public abstract class AbstractProcessor<T, R> extends AbstractPublisher<R> implements Flow.Processor<T, R> {
+    protected InPort<T> inPort = new InPort<>();
 
     @Override
     public void onSubscribe(Flow.Subscription subscription) {
@@ -31,16 +30,9 @@ public abstract class AbstractProcessor<T, R> extends Actor implements Flow.Proc
         inPort.onComplete();
     }
 
-    protected void atComplete() {
-        outPort.onComplete();
-    }
-    protected void atError(Throwable throwable) {
-        outPort.onError(throwable);
-    }
-
     @Override
-    public void subscribe(Flow.Subscriber<? super R> subscriber) {
-        outPort.subscribe(subscriber);
+    protected R atNext() {
+        throw new UnsupportedOperationException();
     }
 
     /**
@@ -56,21 +48,23 @@ public abstract class AbstractProcessor<T, R> extends Actor implements Flow.Proc
     @Override
     protected void run() {
         try {
-            if (!inPort.isCompleted()) {
-                T item = inPort.remove();
-                R res= atNext(item);
-                if (res!=null) {
-                    outPort.onNext(res);
-                    restart();
-                } else {
-                    outPort.onComplete();
-                }
-            } else {
+            T item = inPort.poll();
+            if (inPort.isCompleted()) {
                 Throwable thr = inPort.getCompletionException();
                 if (thr == null) {
                     atComplete();
                 } else {
                     atError(thr);
+                }
+            } else {
+                atNext(item);
+                R res= atNext(item);
+                if (res==null) {
+                    atComplete();
+                } else if (outPort.onNext(res)) {
+                    restart();
+                } else {
+                    atComplete();
                 }
             }
         } catch (Throwable throwable) {

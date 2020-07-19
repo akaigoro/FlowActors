@@ -53,10 +53,11 @@ public abstract class Actor {
          * under synchronized (Actor.this)
          */
         protected void block() {
-            if (ready) {
-                blocked++;
-                ready = false;
+            if (!ready) {
+                return;
             }
+            ready = false;
+            blocked++;
         }
 
         protected void unBlock() {
@@ -65,25 +66,21 @@ public abstract class Actor {
             }
             ready = true;
             blocked--;
-            if (blocked>0) {
-                return;
+            if (blocked == 0) {
+                fire();
             }
-            fire();
         }
     }
 
-    public synchronized void join(long timeout, TimeUnit unit) throws InterruptedException, TimeoutException {
-        join(unit.toMillis(timeout));
-    }
-
-    public synchronized void join(long timeout) throws InterruptedException, TimeoutException {
+    public synchronized void join(long timeout0) throws InterruptedException, TimeoutException {
+        long timeout = timeout0;
         long targetTime = System.currentTimeMillis() + timeout;
-        while (state!=State.COMPLETED) {
+        while (state!=State.COMPLETED && timeout > 0) {
             wait(timeout);
             timeout = targetTime - System.currentTimeMillis();
-            if (timeout < 0) {
-                throw new TimeoutException();
-            }
+        }
+        if (state!=State.COMPLETED) {
+            throw new TimeoutException();
         }
     }
 
@@ -128,10 +125,10 @@ public abstract class Actor {
             subscriber = null;
         }
 
-        public void onNext(T item) {
+        public boolean onNext(T item) {
             synchronized (Actor.this) {
                 if (subscriber == null) {
-                    return;
+                    return false;
                 }
                 if (requested == 0) {
                     subscriber.onError(new IllegalStateException());
@@ -142,12 +139,13 @@ public abstract class Actor {
                 }
             }
             subscriber.onNext(item);
+            return true;
         }
 
         public void onComplete() {
             synchronized (Actor.this) {
                 if (subscriber == null) {
-                    throw new IllegalStateException();
+                    return;
                 }
             }
             subscriber.onComplete();
@@ -156,7 +154,7 @@ public abstract class Actor {
         public void onError(Throwable throwable) {
             synchronized (Actor.this) {
                 if (subscriber == null) {
-                    throw new IllegalStateException();
+                    return;
                 }
             }
             subscriber.onError(throwable);
@@ -166,7 +164,7 @@ public abstract class Actor {
     class InPort<T> extends Port implements Flow.Subscriber<T>  {
         private Flow.Subscription subscription;
         private T item;
-        private boolean completed;
+        private boolean completeSignalled;
         private Throwable completionException = null;
 
         @Override
@@ -183,7 +181,7 @@ public abstract class Actor {
         @Override
         public void onNext(T item) {
             synchronized (Actor.this) {
-                if (completed) {
+                if (completeSignalled) {
                     return;
                 }
                 if (item == null) {
@@ -197,13 +195,13 @@ public abstract class Actor {
         @Override
         public void onError(Throwable throwable) {
             synchronized (Actor.this) {
-                if (completed) {
+                if (completeSignalled) {
                     return;
                 }
                 if (throwable == null) {
                     throw new NullPointerException();
                 }
-                completed = true;
+                completeSignalled = true;
                 completionException = throwable;
                 unBlock();
             }
@@ -212,10 +210,10 @@ public abstract class Actor {
         @Override
         public void onComplete() {
             synchronized (Actor.this) {
-                if (completed) {
+                if (completeSignalled) {
                     return;
                 }
-                completed = true;
+                completeSignalled = true;
                 if (item == null) {
                     state = State.COMPLETED;
                     Actor.this.notifyAll();
@@ -232,22 +230,22 @@ public abstract class Actor {
             return completionException;
         }
 
-        public T remove() {
-            T res;
+        public T poll() {
             synchronized (Actor.this) {
-                if (item == null || subscription == null) {
+                if (subscription == null) {
                     throw new IllegalStateException();
                 }
-                res = item;
+                T res = item;
                 item = null;
-                subscription.request(1);
-                block();
-                if (completed) {
+                if (completeSignalled) {
                     state =  State.COMPLETED;
                     Actor.this.notifyAll();
+                } else {
+                    subscription.request(1);
+                    block();
                 }
+                return res;
             }
-            return res;
         }
     }
 }

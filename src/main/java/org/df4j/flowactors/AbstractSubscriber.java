@@ -3,7 +3,7 @@ package org.df4j.flowactors;
 import java.util.concurrent.Flow;
 
 public abstract class AbstractSubscriber<T> extends Actor implements Flow.Subscriber<T> {
-    private InPort<T> inPort = new InPort<>();
+    protected InPort<T> inPort = new InPort<>();
 
     @Override
     public void onSubscribe(Flow.Subscription subscription) {
@@ -36,20 +36,20 @@ public abstract class AbstractSubscriber<T> extends Actor implements Flow.Subscr
     @Override
     protected void run() {
         try {
-            if (!inPort.isCompleted()) {
-                T item = inPort.remove();
-                atNext(item);
-                restart();
-            } else {
+            T item = inPort.poll();
+            if (inPort.isCompleted()) {
                 Throwable thr = inPort.getCompletionException();
                 if (thr == null) {
                     atComplete();
                 } else {
                     atError(thr);
                 }
+            } else {
+                atNext(item);
+                restart();
             }
         } catch (Throwable throwable) {
-            inPort.onError(throwable);
+            atError(throwable);
         }
     }
 }

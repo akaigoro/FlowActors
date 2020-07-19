@@ -8,7 +8,14 @@ import java.util.concurrent.Flow;
  * @param <T> type of produced data
  */
 public abstract class AbstractPublisher<T> extends Actor implements Flow.Publisher<T>{
-    private OutPort<T> outPort = new OutPort<>();
+    protected OutPort<T> outPort = new OutPort<>();
+
+    protected void atComplete() {
+        outPort.onComplete();
+    }
+    protected void atError(Throwable throwable) {
+        outPort.onError(throwable);
+    }
 
     @Override
     public void subscribe(Flow.Subscriber<? super T> subscriber) {
@@ -23,14 +30,15 @@ public abstract class AbstractPublisher<T> extends Actor implements Flow.Publish
     protected void run() {
         try {
             T res = atNext();
-            if (res!=null) {
-                outPort.onNext(res);
+            if (res==null) {
+                atComplete();
+            } else if (outPort.onNext(res)) {
                 restart();
             } else {
-                outPort.onComplete();
+                atComplete();
             }
         } catch (Throwable throwable) {
-            outPort.onError(throwable);
+            atError(throwable);
         }
     }
 }
