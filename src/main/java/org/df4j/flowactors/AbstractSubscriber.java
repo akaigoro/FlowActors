@@ -3,7 +3,7 @@ package org.df4j.flowactors;
 import java.util.concurrent.Flow;
 
 public abstract class AbstractSubscriber<T> extends Actor implements Flow.Subscriber<T> {
-    protected InPort<T> inPort = new InPort<>();
+    protected ReactiveInPort<T> inPort = new ReactiveInPort<>();
 
     @Override
     public void onSubscribe(Flow.Subscription subscription) {

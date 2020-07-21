@@ -8,7 +8,7 @@ import java.util.concurrent.Flow;
  * @param <T> type of produced data
  */
 public abstract class AbstractPublisher<T> extends Actor implements Flow.Publisher<T>{
-    protected OutPort<T> outPort = new OutPort<>();
+    protected ReactiveOutPort<T> outPort = new ReactiveOutPort<>();
 
     protected void atComplete() {
         outPort.onComplete();
