@@ -1,5 +1,6 @@
 package org.df4j.flowactors;
 
+import java.util.NoSuchElementException;
 import java.util.concurrent.Flow;
 
 /**
@@ -47,28 +48,31 @@ public abstract class AbstractProcessor<T, R> extends AbstractPublisher<R> imple
      */
     @Override
     protected void run() {
+        T item;
         try {
-            T item = inPort.poll();
-            if (inPort.isCompleted()) {
-                Throwable thr = inPort.getCompletionException();
-                if (thr == null) {
-                    atComplete();
-                } else {
-                    atError(thr);
-                }
+            item = inPort.remove();
+        } catch (NoSuchElementException throwable) {
+            Throwable thr = inPort.getCompletionException();
+            if (thr == null) {
+                atComplete();
             } else {
-                atNext(item);
-                R res= atNext(item);
-                if (res==null) {
-                    atComplete();
-                } else if (outPort.onNext(res)) {
-                    restart();
-                } else {
-                    atComplete();
-                }
+                atError(thr);
             }
+            return;
+        }
+        R res;
+        try {
+            res = atNext(item);
         } catch (Throwable throwable) {
-            inPort.onError(throwable);
+            atError(throwable);
+            return;
+        }
+        if (res == null) {
+            atComplete();
+        } else {
+            outPort.onNext(res);
+            restart();
         }
     }
 }
+

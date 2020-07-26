@@ -1,5 +1,6 @@
 package org.df4j.flowactors;
 
+import java.util.NoSuchElementException;
 import java.util.concurrent.Flow;
 
 public abstract class AbstractSubscriber<T> extends Actor implements Flow.Subscriber<T> {
@@ -26,7 +27,6 @@ public abstract class AbstractSubscriber<T> extends Actor implements Flow.Subscr
     }
 
     protected abstract void atNext(T item) throws Throwable;
-    protected void atComplete() {}
     protected void atError(Throwable throwable) {
         throwable.printStackTrace();
     }
@@ -35,21 +35,27 @@ public abstract class AbstractSubscriber<T> extends Actor implements Flow.Subscr
      */
     @Override
     protected void run() {
+        T item;
         try {
-            T item = inPort.poll();
-            if (inPort.isCompleted()) {
-                Throwable thr = inPort.getCompletionException();
-                if (thr == null) {
-                    atComplete();
-                } else {
-                    atError(thr);
-                }
-            } else {
-                atNext(item);
-                restart();
+            item = inPort.remove();
+        } catch (NoSuchElementException throwable) {
+            if (!inPort.isCompleted()) {
+                throw new RuntimeException("Internal error");
             }
+            Throwable thr = inPort.getCompletionException();
+            if (thr == null) {
+                atComplete();
+            } else {
+                atError(thr);
+            }
+            return;
+        }
+        try {
+            atNext(item);
         } catch (Throwable throwable) {
             atError(throwable);
+            return;
         }
+        restart();
     }
 }

@@ -1,5 +1,6 @@
 package org.df4j.flowactors;
 
+import java.util.NoSuchElementException;
 import java.util.concurrent.*;
 
 public abstract class Actor {
@@ -32,6 +33,23 @@ public abstract class Actor {
 
     public boolean isCompleted() {
         return state == State.COMPLETED;
+    }
+
+    protected synchronized void atComplete() {
+        state = State.COMPLETED;
+        notifyAll();
+    }
+
+    public synchronized void join(long timeout0) throws InterruptedException, TimeoutException {
+        long timeout = timeout0;
+        long targetTime = System.currentTimeMillis() + timeout;
+        while (state!=State.COMPLETED && timeout > 0) {
+            wait(timeout);
+            timeout = targetTime - System.currentTimeMillis();
+        }
+        if (state!=State.COMPLETED) {
+            throw new TimeoutException();
+        }
     }
 
     public enum State {
@@ -72,27 +90,14 @@ public abstract class Actor {
         }
     }
 
-    public synchronized void join(long timeout0) throws InterruptedException, TimeoutException {
-        long timeout = timeout0;
-        long targetTime = System.currentTimeMillis() + timeout;
-        while (state!=State.COMPLETED && timeout > 0) {
-            wait(timeout);
-            timeout = targetTime - System.currentTimeMillis();
-        }
-        if (state!=State.COMPLETED) {
-            throw new TimeoutException();
-        }
-    }
-
     public class AsyncSemaPort extends Port implements AsyncSema {
-        private int permissions;
+        private long permissions = 0;
 
-        public AsyncSemaPort(int permissions) {
+        public AsyncSemaPort(long permissions) {
             this.permissions = permissions;
         }
 
         public AsyncSemaPort() {
-            this(0);
         }
 
         @Override
@@ -102,110 +107,42 @@ public abstract class Actor {
             }
             boolean doUnBlock = permissions == 0;
             permissions += n;
+            if (permissions < 0) { // overflow
+                permissions = Long.MAX_VALUE;
+            }
             if (doUnBlock) {
                 unBlock();
             }
         }
 
-        protected synchronized void aquire() {
-            if (permissions == 0) {
-                throw new IllegalStateException();
+        public synchronized void aquire(long delta) {
+            if (delta <= 0) {
+                throw new IllegalArgumentException();
             }
-            permissions--;
+            long newPermissionsValue = permissions-delta;
+            if (newPermissionsValue < 0) {
+                throw new IllegalArgumentException();
+            }
+            permissions = newPermissionsValue;
             if (permissions == 0) {
                 block();
             }
         }
-    }
 
-    public class OutPort<T> implements Flow.Publisher<T>, Flow.Subscription {
-        Flow.Subscriber<? super T> subscriber;
-
-        @Override
-        public void subscribe(Flow.Subscriber<? super T> subscriber) {
-            if (subscriber == null) {
-                throw new NullPointerException();
-            }
-            if (this.subscriber != null) {
-                subscriber.onError(new IllegalStateException());
-            }
-            this.subscriber = subscriber;
-            subscriber.onSubscribe(this);
-        }
-
-        @Override
-        public void request(long n) {
-        }
-
-        @Override
-        public synchronized void cancel() {
-            if (subscriber == null) {
-                return;
-            }
-            subscriber = null;
-        }
-
-        public boolean onNext(T item) {
-            synchronized (Actor.this) {
-                if (subscriber == null) {
-                    return false;
-                }
-            }
-            subscriber.onNext(item);
-            return true;
-        }
-
-        public void onComplete() {
-            synchronized (Actor.this) {
-                if (subscriber == null) {
-                    return;
-                }
-            }
-            subscriber.onComplete();
-        }
-
-        public void onError(Throwable throwable) {
-            synchronized (Actor.this) {
-                if (subscriber == null) {
-                    return;
-                }
-            }
-            subscriber.onError(throwable);
+        public void aquire() {
+            aquire(1);
         }
     }
 
-    public class ReactiveOutPort<T> extends OutPort<T> {
-        AsyncSemaPort sema = new AsyncSemaPort();
-
-        @Override
-        public synchronized void request(long n) {
-            if (subscriber == null) {
-                return;
-            }
-            if (n <= 0) {
-                subscriber.onError(new IllegalArgumentException());
-                return;
-            }
-            sema.release(n);
-        }
-
-        public boolean onNext(T item) {
-            synchronized (Actor.this) {
-                if (subscriber == null) {
-                    return false;
-                }
-                sema.aquire();
-            }
-            subscriber.onNext(item);
-            return true;
-        }
-    }
-
-    public class ReactiveInPort<T> extends Port implements Flow.Subscriber<T> {
+    public class InPort<T> extends Port implements Flow.Subscriber<T> {
         protected Flow.Subscription subscription;
-        protected T item;
+        private T item;
         protected boolean completeSignalled;
         protected Throwable completionException = null;
+
+        protected T current() {
+            return item;
+        }
 
         @Override
         public void onSubscribe(Flow.Subscription subscription) {
@@ -214,21 +151,31 @@ public abstract class Actor {
                 return;
             }
             this.subscription = subscription;
-            subscription.request(1);
         }
 
         public T poll() {
             synchronized (Actor.this) {
-                if (subscription == null) {
-                    throw new IllegalStateException();
-                }
                 T res = item;
                 item = null;
-                if (completeSignalled) {
-                    state =  State.COMPLETED;
-                    Actor.this.notifyAll();
-                } else {
-                    subscription.request(1);
+                if (!completeSignalled) {
+                    block();
+                }
+                return res;
+            }
+        }
+
+        public T remove() {
+            synchronized (Actor.this) {
+                T res = item;
+                item = null;
+                if (res == null) {
+                    if (completeSignalled) {
+                        throw new NoSuchElementException(); // better should be CompletionException(
+                    } else {
+                        throw new RuntimeException("Internal error");
+                    }
+                }
+                if (!completeSignalled) {
                     block();
                 }
                 return res;
@@ -237,12 +184,12 @@ public abstract class Actor {
 
         @Override
         public void onNext(T item) {
+            if (item == null) {
+                throw new NullPointerException();
+            }
             synchronized (Actor.this) {
                 if (completeSignalled) {
                     return;
-                }
-                if (item == null) {
-                    throw new NullPointerException();
                 }
                 this.item = item;
                 unBlock();
@@ -271,20 +218,108 @@ public abstract class Actor {
                     return;
                 }
                 completeSignalled = true;
-                if (item == null) {
-                    state = State.COMPLETED;
-                    Actor.this.notifyAll();
-                }
                 unBlock();
             }
         }
 
         public boolean isCompleted() {
-            return state == State.COMPLETED;
+            return item==null && state == State.COMPLETED;
         }
 
         public Throwable getCompletionException() {
             return completionException;
+        }
+    }
+
+    public class ReactiveInPort<T> extends InPort<T> {
+
+        @Override
+        public void onSubscribe(Flow.Subscription subscription) {
+            super.onSubscribe(subscription);
+            request(1);
+        }
+
+        public void request(long n) {
+            subscription.request(n);
+        }
+
+        @Override
+        public T remove() {
+            T res = super.remove();
+            request(1);
+            return res;
+        }
+    }
+
+    public class OutPort<T> implements Flow.Publisher<T>, Flow.Subscription {
+        InPort<Flow.Subscriber<? super T>> subscriberPort = new InPort<>();
+
+        @Override
+        public void subscribe(Flow.Subscriber<? super T> subscriber) {
+            if (subscriber == null) {
+                subscriber.onError(new NullPointerException());
+                return;
+            }
+            this.subscriberPort.onNext(subscriber);
+            subscriber.onSubscribe(this);
+        }
+
+        public void request(long n) {
+            // do nothing
+        }
+
+        @Override
+        public void cancel() {
+            subscriberPort.poll();
+        }
+
+        public void onNext(T item) {
+            subscriberPort.current().onNext(item);
+        }
+
+        public void onComplete() {
+            subscriberPort.current().onComplete();
+        }
+
+        public void onError(Throwable throwable) {
+            subscriberPort.current().onError(throwable);
+        }
+    }
+
+    public class ReactiveOutPort<T> extends OutPort<T> {
+        AsyncSemaPort sema = new AsyncSemaPort();
+
+        @Override
+        public void request(long n) {
+            Flow.Subscriber<? super T> subscriber;
+            synchronized (Actor.this) {
+                subscriber = subscriberPort.current();
+                if (subscriber == null) {
+                    return;
+                }
+                try {
+                    sema.release(n);
+                } catch (IllegalArgumentException e) {
+                    subscriber.onError(e);
+                }
+            }
+        }
+
+        public void onNext(T item) {
+            Flow.Subscriber<? super T> subscriber;
+            synchronized (Actor.this) {
+                subscriber = subscriberPort.current();
+                if (subscriber == null) {
+                    return;
+                }
+                try {
+                    sema.aquire();
+                } catch (IllegalArgumentException e) {
+                    subscriber.onError(e);
+                    return;
+                }
+            }
+            subscriber.onNext(item);
         }
     }
 }

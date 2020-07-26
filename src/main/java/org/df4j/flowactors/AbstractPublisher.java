@@ -11,6 +11,7 @@ public abstract class AbstractPublisher<T> extends Actor implements Flow.Publish
     protected ReactiveOutPort<T> outPort = new ReactiveOutPort<>();
 
     protected void atComplete() {
+        super.atComplete();
         outPort.onComplete();
     }
     protected void atError(Throwable throwable) {
@@ -32,10 +33,9 @@ public abstract class AbstractPublisher<T> extends Actor implements Flow.Publish
             T res = atNext();
             if (res==null) {
                 atComplete();
-            } else if (outPort.onNext(res)) {
-                restart();
             } else {
-                atComplete();
+                outPort.onNext(res);
+                restart();
             }
         } catch (Throwable throwable) {
             atError(throwable);

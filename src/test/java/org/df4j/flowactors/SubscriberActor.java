@@ -19,6 +19,7 @@ public class SubscriberActor extends AbstractSubscriber<Long> {
 
     @Override
     public void atComplete() {
+        super.atComplete();
         logger.info("  got: completed.");
     }
 
