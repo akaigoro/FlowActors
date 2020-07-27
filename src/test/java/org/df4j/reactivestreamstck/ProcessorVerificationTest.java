@@ -2,11 +2,11 @@ package org.df4j.reactivestreamstck;
 
 import org.df4j.flowactors.ProcessorActor;
 import org.df4j.flowactors.PublisherActor;
+import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscriber;
 import org.reactivestreams.tck.TestEnvironment;
 
-import java.util.concurrent.Flow;
-
-public class ProcessorVerificationTest extends org.reactivestreams.tck.flow.FlowPublisherVerification<Long> {
+public class ProcessorVerificationTest extends org.reactivestreams.tck.PublisherVerification<Long> {
     static final long defaultTimeout = 400;
 
     public ProcessorVerificationTest() {
@@ -14,7 +14,7 @@ public class ProcessorVerificationTest extends org.reactivestreams.tck.flow.Flow
     }
 
     @Override
-    public Flow.Publisher<Long> createFlowPublisher(long elements) {
+    public Publisher<Long> createPublisher(long elements) {
         PublisherActor publisher = new PublisherActor(elements);
         ProcessorActor processor = new ProcessorActor(0);
         publisher.subscribe(processor);
@@ -24,7 +24,7 @@ public class ProcessorVerificationTest extends org.reactivestreams.tck.flow.Flow
     }
 
     @Override
-    public Flow.Publisher<Long> createFailedFlowPublisher() {
+    public Publisher<Long> createFailedPublisher() {
         MyFailedPublisherActor actor = new MyFailedPublisherActor();
         actor.start();
         return actor;
@@ -37,7 +37,7 @@ public class ProcessorVerificationTest extends org.reactivestreams.tck.flow.Flow
         }
 
         @Override
-        public void subscribe(Flow.Subscriber<? super Long> subscriber) {
+        public void subscribe(Subscriber<? super Long> subscriber) {
             super.subscribe(subscriber);
             subscriber.onError(new IllegalStateException());
         }

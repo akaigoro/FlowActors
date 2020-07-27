@@ -1,18 +1,21 @@
 package org.df4j.flowactors;
 
 import java.util.NoSuchElementException;
-import java.util.concurrent.Flow;
+
+import org.reactivestreams.Processor;
+import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscription;
 
 /**
  * To make concrete processor, the method {@link AbstractProcessor##atNext(Object)} need to be implemented
  * @param <T> type of processed data
  * @param <R> type of produced data
  */
-public abstract class AbstractProcessor<T, R> extends AbstractPublisher<R> implements Flow.Processor<T, R> {
+public abstract class AbstractProcessor<T, R> extends AbstractPublisher<R> implements Processor<T, R> {
     protected ReactiveInPort<T> inPort = new ReactiveInPort<>();
 
     @Override
-    public void onSubscribe(Flow.Subscription subscription) {
+    public void onSubscribe(Subscription subscription) {
         inPort.onSubscribe(subscription);
     }
 

@@ -1,5 +1,9 @@
 package org.df4j.flowactors;
 
+import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
+
 import java.util.NoSuchElementException;
 import java.util.concurrent.*;
 
@@ -134,8 +138,8 @@ public abstract class Actor {
         }
     }
 
-    public class InPort<T> extends Port implements Flow.Subscriber<T> {
-        protected Flow.Subscription subscription;
+    public class InPort<T> extends Port implements Subscriber<T> {
+        protected Subscription subscription;
         private T item;
         protected boolean completeSignalled;
         protected Throwable completionException = null;
@@ -145,7 +149,7 @@ public abstract class Actor {
         }
 
         @Override
-        public void onSubscribe(Flow.Subscription subscription) {
+        public void onSubscribe(Subscription subscription) {
             if (this.subscription != null) {
                 subscription.cancel();
                 return;
@@ -234,7 +238,7 @@ public abstract class Actor {
     public class ReactiveInPort<T> extends InPort<T> {
 
         @Override
-        public void onSubscribe(Flow.Subscription subscription) {
+        public void onSubscribe(Subscription subscription) {
             super.onSubscribe(subscription);
             request(1);
         }
@@ -251,11 +255,11 @@ public abstract class Actor {
         }
     }
 
-    public class OutPort<T> implements Flow.Publisher<T>, Flow.Subscription {
-        InPort<Flow.Subscriber<? super T>> subscriberPort = new InPort<>();
+    public class OutPort<T> implements Publisher<T>, Subscription {
+        InPort<Subscriber<? super T>> subscriberPort = new InPort<>();
 
         @Override
-        public void subscribe(Flow.Subscriber<? super T> subscriber) {
+        public void subscribe(Subscriber<? super T> subscriber) {
             if (subscriber == null) {
                 subscriber.onError(new NullPointerException());
                 return;
@@ -291,7 +295,7 @@ public abstract class Actor {
 
         @Override
         public void request(long n) {
-            Flow.Subscriber<? super T> subscriber;
+            Subscriber<? super T> subscriber;
             synchronized (Actor.this) {
                 subscriber = subscriberPort.current();
                 if (subscriber == null) {
@@ -306,7 +310,7 @@ public abstract class Actor {
         }
 
         public void onNext(T item) {
-            Flow.Subscriber<? super T> subscriber;
+            Subscriber<? super T> subscriber;
             synchronized (Actor.this) {
                 subscriber = subscriberPort.current();
                 if (subscriber == null) {

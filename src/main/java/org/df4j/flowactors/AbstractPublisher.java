@@ -1,13 +1,14 @@
 package org.df4j.flowactors;
 
-import java.util.concurrent.Flow;
+import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscriber;
 
 /**
- * minimalistic {@link Flow.Publisher} implementation.
+ * minimalistic {@link Publisher} implementation.
  * Only one subscriber can subscribe.
  * @param <T> type of produced data
  */
-public abstract class AbstractPublisher<T> extends Actor implements Flow.Publisher<T>{
+public abstract class AbstractPublisher<T> extends Actor implements Publisher<T>{
     protected ReactiveOutPort<T> outPort = new ReactiveOutPort<>();
 
     protected void atComplete() {
@@ -19,7 +20,7 @@ public abstract class AbstractPublisher<T> extends Actor implements Flow.Publish
     }
 
     @Override
-    public void subscribe(Flow.Subscriber<? super T> subscriber) {
+    public void subscribe(Subscriber<? super T> subscriber) {
         outPort.subscribe(subscriber);
     }
 
