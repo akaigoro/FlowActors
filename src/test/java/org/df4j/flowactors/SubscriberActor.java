@@ -11,20 +11,18 @@ public class SubscriberActor extends AbstractSubscriber<Long> {
     }
 
     @Override
-    protected void atNext(Long item) {
+    protected void whenNext(Long item) {
         if (Math.abs(item) < 100 || item%10 == 0) {
             logger.info("  got:"+item);
         }
     }
-
     @Override
-    public void atComplete() {
-        super.atComplete();
+    public void whenComplete() {
         logger.info("  got: completed.");
     }
 
     @Override
-    public void atError(Throwable throwable) {
+    public void whenError(Throwable throwable) {
         logger.info(" completed with error:"+throwable);
     }
 }

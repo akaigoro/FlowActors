@@ -39,7 +39,7 @@ public class PublisherVerificationTest extends org.reactivestreams.tck.Publisher
         }
 
         @Override
-        protected Long atNext() {
+        protected Long whenNext() {
             throw new RuntimeException();
         }
     }

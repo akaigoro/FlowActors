@@ -4,8 +4,6 @@ import org.df4j.flowactors.SubscriberActor;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.tck.TestEnvironment;
 
-import org.reactivestreams.Publisher;
-
 public class SubscriberBlackboxVerificationTest extends org.reactivestreams.tck.SubscriberBlackboxVerification<Long> {
     static final  int defaultTimeout = 400;
 

@@ -1,17 +1,19 @@
-package org.df4j.flowactors;
+package org.df4j.plainactors;
 
 import org.reactivestreams.Processor;
+import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
 import java.util.NoSuchElementException;
 
 /**
- * To make concrete processor, the method {@link AbstractProcessor##atNext(Object)} need to be implemented
+ * To make concrete processor, the method {@link TransformerActor##atNext(Object)} need to be implemented
  * @param <T> type of processed data
  * @param <R> type of produced data
  */
-public abstract class AbstractProcessor<T, R> extends AbstractPublisher<R> implements Processor<T, R> {
-    protected ReactiveInPort<T> inPort = new ReactiveInPort<>();
+public abstract class TransformerActor<T, R> extends PlainActor implements Processor<T, R>, org.reactivestreams.Publisher<R> {
+    protected InPort<T> inPort = new InPort<>();
+    protected OutPort<R> outPort = new OutPort<>();
 
     @Override
     public void onSubscribe(Subscription subscription) {
@@ -34,8 +36,8 @@ public abstract class AbstractProcessor<T, R> extends AbstractPublisher<R> imple
     }
 
     @Override
-    protected R whenNext() {
-        throw new UnsupportedOperationException();
+    public void subscribe(Subscriber<? super R> subscriber) {
+        outPort.subscribe(subscriber);
     }
 
     /**
@@ -45,6 +47,15 @@ public abstract class AbstractProcessor<T, R> extends AbstractPublisher<R> imple
      * @throws Throwable if something went wrong
      */
     protected abstract R atNext(T item)  throws Throwable;
+
+    protected void atComplete() {
+        super.atComplete();
+        outPort.onComplete();
+    }
+
+    protected void atError(Throwable throwable) {
+        outPort.onError(throwable);
+    }
 
     /** processes one data item
      */

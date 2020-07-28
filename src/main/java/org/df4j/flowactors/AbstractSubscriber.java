@@ -5,7 +5,7 @@ import org.reactivestreams.Subscription;
 
 import java.util.NoSuchElementException;
 
-public abstract class AbstractSubscriber<T> extends Actor implements Subscriber<T> {
+public abstract class AbstractSubscriber<T> extends FlowActor implements Subscriber<T> {
     protected ReactiveInPort<T> inPort = new ReactiveInPort<>();
 
     @Override
@@ -28,8 +28,10 @@ public abstract class AbstractSubscriber<T> extends Actor implements Subscriber<
         inPort.onComplete();
     }
 
-    protected abstract void atNext(T item) throws Throwable;
-    protected void atError(Throwable throwable) {
+    protected abstract void whenNext(T item) throws Throwable;
+
+    protected void whenComplete() {}
+    protected void whenError(Throwable throwable) {
         throwable.printStackTrace();
     }
 
@@ -44,18 +46,19 @@ public abstract class AbstractSubscriber<T> extends Actor implements Subscriber<
             if (!inPort.isCompleted()) {
                 throw new RuntimeException("Internal error");
             }
+            atComplete();
             Throwable thr = inPort.getCompletionException();
             if (thr == null) {
-                atComplete();
+                whenComplete();
             } else {
-                atError(thr);
+                whenError(thr);
             }
             return;
         }
         try {
-            atNext(item);
+            whenNext(item);
         } catch (Throwable throwable) {
-            atError(throwable);
+            whenError(throwable);
             return;
         }
         restart();

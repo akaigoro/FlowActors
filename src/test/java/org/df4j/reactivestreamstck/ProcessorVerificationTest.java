@@ -43,7 +43,7 @@ public class ProcessorVerificationTest extends org.reactivestreams.tck.Publisher
         }
 
         @Override
-        protected Long atNext() {
+        protected Long whenNext() {
             throw new RuntimeException();
         }
     }
