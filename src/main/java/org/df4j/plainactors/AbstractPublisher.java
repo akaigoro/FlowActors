@@ -1,21 +1,23 @@
-package org.df4j.flowactors;
+package org.df4j.plainactors;
 
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 
+import java.util.logging.Logger;
+
 /**
  * minimalistic {@link Publisher} implementation.
  * Only one subscriber can subscribe.
- * @param <T> type of produced data
  */
-public abstract class AbstractPublisher<T> extends FlowActor implements Publisher<T>{
-    protected ReactiveOutPort<T> outPort = new ReactiveOutPort<>();
+public abstract class AbstractPublisher<T> extends PlainActor implements Publisher<T>{
+    Logger logger = Logger.getLogger("producer");
+    protected OutPort<T> outPort = new OutPort<>();
 
     protected void atComplete(Throwable cause) {
         super.atComplete(cause);
         if (cause == null) {
             outPort.onComplete();
-         } else {
+        } else {
             outPort.onError(cause);
         }
     }
@@ -25,7 +27,8 @@ public abstract class AbstractPublisher<T> extends FlowActor implements Publishe
         outPort.subscribe(subscriber);
     }
 
-    protected abstract T whenNext()  throws Throwable;
+    long cnt = 0;
+    protected abstract T whenNext();
 
     /** generates one data item
      */

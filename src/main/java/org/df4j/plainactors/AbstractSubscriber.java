@@ -1,12 +1,11 @@
 package org.df4j.plainactors;
 
-import org.df4j.flowactors.FlowActor;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
 import java.util.NoSuchElementException;
 
-public abstract class ConsumerActor<T> extends PlainActor implements Subscriber<T> {
+public abstract class AbstractSubscriber<T> extends PlainActor implements Subscriber<T> {
     protected InPort<T> inPort = new InPort<>();
 
     @Override
@@ -29,8 +28,8 @@ public abstract class ConsumerActor<T> extends PlainActor implements Subscriber<
         inPort.onComplete();
     }
 
-    protected abstract void atNext(T item) throws Throwable;
-    protected void atError(Throwable throwable) {
+    protected abstract void whenNext(T item) throws Throwable;
+    protected void whenError(Throwable throwable) {
         throwable.printStackTrace();
     }
 
@@ -47,16 +46,16 @@ public abstract class ConsumerActor<T> extends PlainActor implements Subscriber<
             }
             Throwable thr = inPort.getCompletionException();
             if (thr == null) {
-                atComplete();
+                atComplete(null);
             } else {
-                atError(thr);
+                whenError(thr);
             }
             return;
         }
         try {
-            atNext(item);
+            whenNext(item);
         } catch (Throwable throwable) {
-            atError(throwable);
+            whenError(throwable);
             return;
         }
         restart();

@@ -30,11 +30,6 @@ public abstract class AbstractSubscriber<T> extends FlowActor implements Subscri
 
     protected abstract void whenNext(T item) throws Throwable;
 
-    protected void whenComplete() {}
-    protected void whenError(Throwable throwable) {
-        throwable.printStackTrace();
-    }
-
     /** processes one data item
      */
     @Override
@@ -46,13 +41,8 @@ public abstract class AbstractSubscriber<T> extends FlowActor implements Subscri
             if (!inPort.isCompleted()) {
                 throw new RuntimeException("Internal error");
             }
-            atComplete();
             Throwable thr = inPort.getCompletionException();
-            if (thr == null) {
-                whenComplete();
-            } else {
-                whenError(thr);
-            }
+            atComplete(thr);
             return;
         }
         try {

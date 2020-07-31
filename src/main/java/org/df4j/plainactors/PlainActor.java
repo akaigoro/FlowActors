@@ -13,6 +13,8 @@ public abstract class PlainActor {
     private Executor excecutor = ForkJoinPool.commonPool();
     private State state = State.CREATED;
     private int blocked = 0;
+    protected Throwable globalCompletionException = null;
+
     /**
      * blocked initially and when running.
      */
@@ -41,9 +43,20 @@ public abstract class PlainActor {
         return state == State.COMPLETED;
     }
 
-    protected synchronized void atComplete() {
+    protected synchronized void atComplete(Throwable cause) {
         state = State.COMPLETED;
+        globalCompletionException = cause;
         notifyAll();
+        if (cause == null) {
+            whenComplete();
+        } else {
+            whenError(cause);
+        }
+    }
+
+    protected void whenComplete() {}
+    protected void whenError(Throwable throwable) {
+        throwable.printStackTrace();
     }
 
     public synchronized void join(long timeout0) throws InterruptedException, TimeoutException {
@@ -57,6 +70,7 @@ public abstract class PlainActor {
             throw new TimeoutException();
         }
     }
+
 
     public enum State {
         CREATED,

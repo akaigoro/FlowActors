@@ -1,4 +1,4 @@
-package org.df4j.flowactors;
+package org.df4j.plainactors;
 
 import java.util.logging.Logger;
 

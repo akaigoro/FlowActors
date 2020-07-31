@@ -7,11 +7,11 @@ import org.reactivestreams.Subscription;
 import java.util.NoSuchElementException;
 
 /**
- * To make concrete processor, the method {@link TransformerActor##atNext(Object)} need to be implemented
+ * To make concrete processor, the method {@link AbstractProcessor##whenNext(Object)} need to be implemented
  * @param <T> type of processed data
  * @param <R> type of produced data
  */
-public abstract class TransformerActor<T, R> extends PlainActor implements Processor<T, R>, org.reactivestreams.Publisher<R> {
+public abstract class AbstractProcessor<T, R> extends PlainActor implements Processor<T, R>, org.reactivestreams.Publisher<R> {
     protected InPort<T> inPort = new InPort<>();
     protected OutPort<R> outPort = new OutPort<>();
 
@@ -46,15 +46,16 @@ public abstract class TransformerActor<T, R> extends PlainActor implements Proce
      * @return processed data
      * @throws Throwable if something went wrong
      */
-    protected abstract R atNext(T item)  throws Throwable;
+    protected abstract R whenNext(T item)  throws Throwable;
 
-    protected void atComplete() {
-        super.atComplete();
-        outPort.onComplete();
-    }
+    protected void atComplete(Throwable thr) {
+        super.atComplete(thr);
+        if (thr == null) {
+            outPort.onComplete();
+        } else {
+            outPort.onError(thr);
+        }
 
-    protected void atError(Throwable throwable) {
-        outPort.onError(throwable);
     }
 
     /** processes one data item
@@ -67,21 +68,21 @@ public abstract class TransformerActor<T, R> extends PlainActor implements Proce
         } catch (NoSuchElementException throwable) {
             Throwable thr = inPort.getCompletionException();
             if (thr == null) {
-                atComplete();
+                atComplete(null);
             } else {
-                atError(thr);
+                atComplete(thr);
             }
             return;
         }
         R res;
         try {
-            res = atNext(item);
+            res = whenNext(item);
         } catch (Throwable throwable) {
-            atError(throwable);
+            atComplete(throwable);
             return;
         }
         if (res == null) {
-            atComplete();
+            atComplete(null);
         } else {
             outPort.onNext(res);
             restart();
