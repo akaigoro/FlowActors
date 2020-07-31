@@ -2,14 +2,19 @@ package org.df4j.flowactors;
 
 import java.util.concurrent.*;
 
-public abstract class Actor {
+public abstract class AbstractActor {
     private Executor excecutor = ForkJoinPool.commonPool();
     protected State state = State.CREATED;
-    private int blocked = 0;
+    private Throwable completionException;
+    private int blockedCount = 0;
     /**
      * blocked initially and when running.
      */
     private Port controlPort = new Port();
+
+    public synchronized boolean isCompleted() {
+        return state == State.COMPLETED;
+    }
 
     private void fire() {
         controlPort.block();
@@ -28,10 +33,26 @@ public abstract class Actor {
         controlPort.unBlock();
     }
 
-    protected abstract void run();
+    protected abstract void whenNext();
 
-    public boolean isCompleted() {
-        return state == State.COMPLETED;
+    protected synchronized void whenComplete() {
+        state = State.COMPLETED;
+    }
+    protected synchronized void whenError(Throwable throwable) {
+        if (state == State.COMPLETED) {
+            return;
+        }
+        state = State.COMPLETED;
+        completionException = throwable;
+    }
+
+    protected void run() {
+        try {
+            whenNext();
+            restart();
+        } catch (Throwable err) {
+            whenError(err);
+        }
     }
 
     public enum State {
@@ -44,8 +65,8 @@ public abstract class Actor {
         boolean ready = false;
 
         public Port() {
-            synchronized (Actor.this) {
-                blocked++;
+            synchronized (AbstractActor.this) {
+                blockedCount++;
             }
         }
 
@@ -54,7 +75,7 @@ public abstract class Actor {
          */
         protected void block() {
             if (ready) {
-                blocked++;
+                blockedCount++;
                 ready = false;
             }
         }
@@ -64,8 +85,8 @@ public abstract class Actor {
                 return;
             }
             ready = true;
-            blocked--;
-            if (blocked>0) {
+            blockedCount--;
+            if (blockedCount >0) {
                 return;
             }
             fire();
@@ -129,7 +150,7 @@ public abstract class Actor {
         }
 
         public void onNext(T item) {
-            synchronized (Actor.this) {
+            synchronized (AbstractActor.this) {
                 if (subscriber == null) {
                     return;
                 }
@@ -145,7 +166,7 @@ public abstract class Actor {
         }
 
         public void onComplete() {
-            synchronized (Actor.this) {
+            synchronized (AbstractActor.this) {
                 if (subscriber == null) {
                     throw new IllegalStateException();
                 }
@@ -154,7 +175,7 @@ public abstract class Actor {
         }
 
         public void onError(Throwable throwable) {
-            synchronized (Actor.this) {
+            synchronized (AbstractActor.this) {
                 if (subscriber == null) {
                     throw new IllegalStateException();
                 }
@@ -182,7 +203,7 @@ public abstract class Actor {
 
         @Override
         public void onNext(T item) {
-            synchronized (Actor.this) {
+            synchronized (AbstractActor.this) {
                 if (completed) {
                     return;
                 }
@@ -196,7 +217,7 @@ public abstract class Actor {
 
         @Override
         public void onError(Throwable throwable) {
-            synchronized (Actor.this) {
+            synchronized (AbstractActor.this) {
                 if (completed) {
                     return;
                 }
@@ -211,14 +232,14 @@ public abstract class Actor {
 
         @Override
         public void onComplete() {
-            synchronized (Actor.this) {
+            synchronized (AbstractActor.this) {
                 if (completed) {
                     return;
                 }
                 completed = true;
                 if (item == null) {
                     state = State.COMPLETED;
-                    Actor.this.notifyAll();
+                    AbstractActor.this.notifyAll();
                 }
                 unBlock();
             }
@@ -232,9 +253,9 @@ public abstract class Actor {
             return completionException;
         }
 
-        public T remove() {
+        public T poll() {
             T res;
-            synchronized (Actor.this) {
+            synchronized (AbstractActor.this) {
                 if (item == null || subscription == null) {
                     throw new IllegalStateException();
                 }
@@ -244,7 +265,7 @@ public abstract class Actor {
                 block();
                 if (completed) {
                     state =  State.COMPLETED;
-                    Actor.this.notifyAll();
+                    AbstractActor.this.notifyAll();
                 }
             }
             return res;

@@ -19,14 +19,14 @@ public class ProcessorActor extends AbstractProcessor<Long,Long> {
     }
 
     @Override
-    public void atComplete() {
-        super.atComplete();
+    public void whenComplete() {
+        super.whenComplete();
         logger.info("  got: completed.");
     }
 
     @Override
-    public void atError(Throwable throwable) {
-        super.atError(throwable);
+    public void whenError(Throwable throwable) {
+        super.whenError(throwable);
         logger.info(" completed with error:"+throwable);
     }
 }

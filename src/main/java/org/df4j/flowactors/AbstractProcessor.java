@@ -7,7 +7,7 @@ import java.util.concurrent.Flow;
  * @param <T> type of processed data
  * @param <R> type of produced data
  */
-public abstract class AbstractProcessor<T, R> extends Actor implements Flow.Processor<T, R> {
+public abstract class AbstractProcessor<T, R> extends AbstractActor implements Flow.Processor<T, R> {
     private InPort<T> inPort = new InPort<>();
     private OutPort<R> outPort = new OutPort<>();
 
@@ -31,10 +31,10 @@ public abstract class AbstractProcessor<T, R> extends Actor implements Flow.Proc
         inPort.onComplete();
     }
 
-    protected void atComplete() {
+    protected void whenComplete() {
         outPort.onComplete();
     }
-    protected void atError(Throwable throwable) {
+    protected void whenError(Throwable throwable) {
         outPort.onError(throwable);
     }
 
@@ -57,7 +57,7 @@ public abstract class AbstractProcessor<T, R> extends Actor implements Flow.Proc
     protected void run() {
         try {
             if (!inPort.isCompleted()) {
-                T item = inPort.remove();
+                T item = inPort.poll();
                 R res= atNext(item);
                 if (res!=null) {
                     outPort.onNext(res);
@@ -68,9 +68,9 @@ public abstract class AbstractProcessor<T, R> extends Actor implements Flow.Proc
             } else {
                 Throwable thr = inPort.getCompletionException();
                 if (thr == null) {
-                    atComplete();
+                    whenComplete();
                 } else {
-                    atError(thr);
+                    whenError(thr);
                 }
             }
         } catch (Throwable throwable) {

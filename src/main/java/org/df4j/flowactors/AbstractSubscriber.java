@@ -2,10 +2,9 @@ package org.df4j.flowactors;
 
 import java.util.concurrent.Flow;
 
-public abstract class AbstractSubscriber<T> extends Actor implements Flow.Subscriber<T> {
-    private Port inPort = new Port();
+public abstract class AbstractSubscriber<T> extends AbstractActor implements Flow.Subscriber<T> {
+    private InPort<T> inPort = new InPort<>();
     private Flow.Subscription subscription;
-    private T item;
     private boolean completeSignalled;
     private Throwable completionException = null;
 
@@ -28,19 +27,16 @@ public abstract class AbstractSubscriber<T> extends Actor implements Flow.Subscr
         if (item == null) {
             throw new NullPointerException();
         }
-        this.item = item;
         inPort.unBlock();
     }
 
-    public T remove() {
+    public T poll() {
         T res;
         synchronized (this) {
             if (subscription == null) {
                 throw new IllegalStateException();
             }
-            res = item;
-            item = null;
-            inPort.block();
+            res = inPort.poll();
             if (completeSignalled) {
                 state =  State.COMPLETED;
                 this.notifyAll();
@@ -84,7 +80,7 @@ public abstract class AbstractSubscriber<T> extends Actor implements Flow.Subscr
     @Override
     protected void run() {
         try {
-            T item = remove();
+            T item = poll();
             if (!isCompleted()) {
                 atNext(item);
                 restart();

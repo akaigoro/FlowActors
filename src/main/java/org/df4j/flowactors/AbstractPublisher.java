@@ -7,7 +7,7 @@ import java.util.concurrent.Flow;
  * Only one subscriber can subscribe.
  * @param <T> type of produced data
  */
-public abstract class AbstractPublisher<T> extends Actor implements Flow.Publisher<T>, Flow.Subscription {
+public abstract class AbstractPublisher<T> extends AbstractActor implements Flow.Publisher<T>, Flow.Subscription {
     private Port outPort = new Port();
 
     Flow.Subscriber<? super T> subscriber;
@@ -94,7 +94,7 @@ public abstract class AbstractPublisher<T> extends Actor implements Flow.Publish
     /** generates one data item
      */
     @Override
-    protected void run() {
+    protected void whenNext() {
         try {
             T res = atNext();
             if (res!=null) {
