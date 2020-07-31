@@ -56,21 +56,9 @@ public class AsyncIterablePublisher<T> implements Publisher<T> {
     new SubscriptionImpl(s).init();
   }
 
-  // These represent the protocol of the `AsyncIterablePublishers` SubscriptionImpls
-  static interface Signal {};
-  enum Cancel implements Signal { Instance; };
-  enum Subscribe implements Signal { Instance; };
-  enum Send implements Signal { Instance; };
-  static final class Request implements Signal {
-    final long n;
-    Request(final long n) {
-      this.n = n;
-    }
-  };
-
   // This is our implementation of the Reactive Streams `Subscription`,
   // which represents the association between a `Publisher` and a `Subscriber`.
-  final class SubscriptionImpl implements Subscription, Runnable {
+  final class SubscriptionImpl implements Subscription, java.lang.Runnable {
     final Subscriber<? super T> subscriber; // We need a reference to the `Subscriber` so we can talk to it
     private boolean cancelled = false; // This flag will track whether this `Subscription` is to be considered cancelled or not
     private long demand = 0; // Here we track the current demand, i.e. what has been requested but not yet delivered
@@ -83,74 +71,15 @@ public class AsyncIterablePublisher<T> implements Publisher<T> {
     }
 
     // This `ConcurrentLinkedQueue` will track signals that are sent to this `Subscription`, like `request` and `cancel`
-    private final ConcurrentLinkedQueue<Signal> inboundSignals = new ConcurrentLinkedQueue<Signal>();
+    private final ConcurrentLinkedQueue<Runnable> inboundSignals = new ConcurrentLinkedQueue<Runnable>();
 
     // We are using this `AtomicBoolean` to make sure that this `Subscription` doesn't run concurrently with itself,
     // which would violate rule 1.3 among others (no concurrent notifications).
     private final AtomicBoolean on = new AtomicBoolean(false);
 
-    // This method will register inbound demand from our `Subscriber` and validate it against rule 3.9 and rule 3.17
-    private void doRequest(final long n) {
-      if (n < 1)
-        terminateDueTo(new IllegalArgumentException(subscriber + " violated the Reactive Streams rule 3.9 by requesting a non-positive number of elements."));
-      else if (demand + n < 1) {
-        // As governed by rule 3.17, when demand overflows `Long.MAX_VALUE` we treat the signalled demand as "effectively unbounded"
-        demand = Long.MAX_VALUE;  // Here we protect from the overflow and treat it as "effectively unbounded"
-        doSend(); // Then we proceed with sending data downstream
-      } else {
-        demand += n; // Here we record the downstream demand
-        doSend(); // Then we can proceed with sending data downstream
-      }
-    }
-
     // This handles cancellation requests, and is idempotent, thread-safe and not synchronously performing heavy computations as specified in rule 3.5
     private void doCancel() {
       cancelled = true;
-    }
-
-    // Instead of executing `subscriber.onSubscribe` synchronously from within `Publisher.subscribe`
-    // we execute it asynchronously, this is to avoid executing the user code (`Iterable.iterator`) on the calling thread.
-    // It also makes it easier to follow rule 1.9
-    private void doSubscribe() {
-      try {
-        iterator = elements.iterator();
-        if (iterator == null)
-          iterator = Collections.<T>emptyList().iterator(); // So we can assume that `iterator` is never null
-      } catch(final Throwable t) {
-        subscriber.onSubscribe(new Subscription() { // We need to make sure we signal onSubscribe before onError, obeying rule 1.9
-          @Override public void cancel() {}
-          @Override public void request(long n) {}
-        });
-        terminateDueTo(t); // Here we send onError, obeying rule 1.09
-      }
-
-      if (!cancelled) {
-        // Deal with setting up the subscription with the subscriber
-        try {
-          subscriber.onSubscribe(this);
-        } catch(final Throwable t) { // Due diligence to obey 2.13
-          terminateDueTo(new IllegalStateException(subscriber + " violated the Reactive Streams rule 2.13 by throwing an exception from onSubscribe.", t));
-        }
-
-        // Deal with already complete iterators promptly
-        boolean hasElements = false;
-        try {
-          hasElements = iterator.hasNext();
-        } catch(final Throwable t) {
-          terminateDueTo(t); // If hasNext throws, there's something wrong and we need to signal onError as per 1.2, 1.4, 
-        }
-
-        // If we don't have anything to deliver, we're already done, so lets do the right thing and
-        // not wait for demand to deliver `onComplete` as per rule 1.2 and 1.3
-        if (!hasElements) {
-          try {
-            doCancel(); // Rule 1.6 says we need to consider the `Subscription` cancelled when `onComplete` is signalled
-            subscriber.onComplete();
-          } catch(final Throwable t) { // As per rule 2.13, `onComplete` is not allowed to throw exceptions, so we do what we can, and log this.
-            (new IllegalStateException(subscriber + " violated the Reactive Streams rule 2.13 by throwing an exception from onComplete.", t)).printStackTrace(System.err);
-          }
-        }
-      }
     }
 
     // This is our behavior for producing elements downstream
@@ -179,7 +108,7 @@ public class AsyncIterablePublisher<T> implements Publisher<T> {
                  && --demand > 0);    // This makes sure that rule 1.1 is upheld (sending more than was demanded)
 
         if (!cancelled && demand > 0) // If the `Subscription` is still alive and well, and we have demand to satisfy, we signal ourselves to send more data
-          signal(Send.Instance);
+          signal(this::doCancel);
       } catch(final Throwable t) {
         // We can only get here if `onNext` or `onComplete` threw, and they are not allowed to according to 2.13, so we can only cancel and log here.
         doCancel(); // Make sure that we are cancelled, since we cannot do anything else since the `Subscriber` is faulty.
@@ -198,27 +127,18 @@ public class AsyncIterablePublisher<T> implements Publisher<T> {
     }
 
     // What `signal` does is that it sends signals to the `Subscription` asynchronously
-    private void signal(final Signal signal) {
-      if (inboundSignals.offer(signal)) // No need to null-check here as ConcurrentLinkedQueue does this for us
-        tryScheduleToExecute(); // Then we try to schedule it for execution, if it isn't already
+    private void signal(final Runnable signal) {
+      inboundSignals.add(signal); // No need to null-check here as ConcurrentLinkedQueue does this for us
+      tryScheduleToExecute(); // Then we try to schedule it for execution, if it isn't already
     }
 
     // This is the main "event loop" if you so will
     @Override public final void run() {
       if(on.get()) { // establishes a happens-before relationship with the end of the previous run
         try {
-          final Signal s = inboundSignals.poll(); // We take a signal off the queue
+          final Runnable s = inboundSignals.poll(); // We take a signal off the queue
           if (!cancelled) { // to make sure that we follow rule 1.8, 3.6 and 3.7
-
-            // Below we simply unpack the `Signal`s and invoke the corresponding methods
-            if (s instanceof Request)
-              doRequest(((Request)s).n);
-            else if (s == Send.Instance)
-              doSend();
-            else if (s == Cancel.Instance)
-              doCancel();
-            else if (s == Subscribe.Instance)
-              doSubscribe();
+            s.run();
           }
         } finally {
           on.set(false); // establishes a happens-before relationship with the beginning of the next run
@@ -256,14 +176,80 @@ public class AsyncIterablePublisher<T> implements Publisher<T> {
     }
     // Our implementation of `Subscription.cancel` sends a signal to the Subscription that the `Subscriber` is not interested in any more elements
     @Override public void cancel() {
-      signal(Cancel.Instance);
+      signal(this::doCancel);
     }
     // The reason for the `init` method is that we want to ensure the `SubscriptionImpl`
     // is completely constructed before it is exposed to the thread pool, therefor this
     // method is only intended to be invoked once, and immediately after the constructor has
     // finished.
     void init() {
-      signal(Subscribe.Instance);
+      signal(new Subscribe());
     }
+
+    final class  Subscribe implements Runnable {
+      @Override
+      public void run() {
+        try {
+          iterator = elements.iterator();
+          if (iterator == null)
+            iterator = Collections.<T>emptyList().iterator(); // So we can assume that `iterator` is never null
+        } catch(final Throwable t) {
+          subscriber.onSubscribe(new Subscription() { // We need to make sure we signal onSubscribe before onError, obeying rule 1.9
+            @Override public void cancel() {}
+            @Override public void request(long n) {}
+          });
+          terminateDueTo(t); // Here we send onError, obeying rule 1.09
+        }
+
+        if (!cancelled) {
+          // Deal with setting up the subscription with the subscriber
+          try {
+            subscriber.onSubscribe(SubscriptionImpl.this);
+          } catch(final Throwable t) { // Due diligence to obey 2.13
+            terminateDueTo(new IllegalStateException(subscriber + " violated the Reactive Streams rule 2.13 by throwing an exception from onSubscribe.", t));
+          }
+
+          // Deal with already complete iterators promptly
+          boolean hasElements = false;
+          try {
+            hasElements = iterator.hasNext();
+          } catch(final Throwable t) {
+            terminateDueTo(t); // If hasNext throws, there's something wrong and we need to signal onError as per 1.2, 1.4,
+          }
+
+          // If we don't have anything to deliver, we're already done, so lets do the right thing and
+          // not wait for demand to deliver `onComplete` as per rule 1.2 and 1.3
+          if (!hasElements) {
+            try {
+              doCancel(); // Rule 1.6 says we need to consider the `Subscription` cancelled when `onComplete` is signalled
+              subscriber.onComplete();
+            } catch(final Throwable t) { // As per rule 2.13, `onComplete` is not allowed to throw exceptions, so we do what we can, and log this.
+              (new IllegalStateException(subscriber + " violated the Reactive Streams rule 2.13 by throwing an exception from onComplete.", t)).printStackTrace(System.err);
+            }
+          }
+        }
+      }
+    };
+
+    final class Request implements Runnable {
+      final long n;
+      Request(final long n) {
+        this.n = n;
+      }
+
+      @Override
+      public void run() {
+        if (n < 1)
+          terminateDueTo(new IllegalArgumentException(subscriber + " violated the Reactive Streams rule 3.9 by requesting a non-positive number of elements."));
+        else if (demand + n < 1) {
+          // As governed by rule 3.17, when demand overflows `Long.MAX_VALUE` we treat the signalled demand as "effectively unbounded"
+          demand = Long.MAX_VALUE;  // Here we protect from the overflow and treat it as "effectively unbounded"
+          doSend(); // Then we proceed with sending data downstream
+        } else {
+          demand += n; // Here we record the downstream demand
+          doSend(); // Then we can proceed with sending data downstream
+        }
+      }
+    };
   };
 }
