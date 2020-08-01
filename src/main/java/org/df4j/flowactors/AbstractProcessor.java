@@ -1,18 +1,21 @@
 package org.df4j.flowactors;
 
-import java.util.concurrent.Flow;
+import java.util.NoSuchElementException;
+
+import org.reactivestreams.Processor;
+import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscription;
 
 /**
  * To make concrete processor, the method {@link AbstractProcessor##atNext(Object)} need to be implemented
  * @param <T> type of processed data
  * @param <R> type of produced data
  */
-public abstract class AbstractProcessor<T, R> extends AbstractActor implements Flow.Processor<T, R> {
-    private InPort<T> inPort = new InPort<>();
-    private OutPort<R> outPort = new OutPort<>();
+public abstract class AbstractProcessor<T, R> extends AbstractPublisher<R> implements Processor<T, R> {
+    protected ReactiveInPort<T> inPort = new ReactiveInPort<>();
 
     @Override
-    public void onSubscribe(Flow.Subscription subscription) {
+    public void onSubscribe(Subscription subscription) {
         inPort.onSubscribe(subscription);
     }
 
@@ -31,16 +34,9 @@ public abstract class AbstractProcessor<T, R> extends AbstractActor implements F
         inPort.onComplete();
     }
 
-    protected void whenComplete() {
-        outPort.onComplete();
-    }
-    protected void whenError(Throwable throwable) {
-        outPort.onError(throwable);
-    }
-
     @Override
-    public void subscribe(Flow.Subscriber<? super R> subscriber) {
-        outPort.subscribe(subscriber);
+    protected R atNext() {
+        throw new UnsupportedOperationException();
     }
 
     /**
@@ -55,26 +51,31 @@ public abstract class AbstractProcessor<T, R> extends AbstractActor implements F
      */
     @Override
     protected void run() {
+        T item;
         try {
-            if (!inPort.isCompleted()) {
-                T item = inPort.poll();
-                R res= atNext(item);
-                if (res!=null) {
-                    outPort.onNext(res);
-                    restart();
-                } else {
-                    outPort.onComplete();
-                }
+            item = inPort.remove();
+        } catch (NoSuchElementException throwable) {
+            Throwable thr = inPort.getCompletionException();
+            if (thr == null) {
+                atComplete();
             } else {
-                Throwable thr = inPort.getCompletionException();
-                if (thr == null) {
-                    whenComplete();
-                } else {
-                    whenError(thr);
-                }
+                atError(thr);
             }
+            return;
+        }
+        R res;
+        try {
+            res = atNext(item);
         } catch (Throwable throwable) {
-            inPort.onError(throwable);
+            atError(throwable);
+            return;
+        }
+        if (res == null) {
+            atComplete();
+        } else {
+            outPort.onNext(res);
+            restart();
         }
     }
 }
+

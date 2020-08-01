@@ -1,20 +1,20 @@
 package org.df4j.flowactors;
 
+import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
+
+import java.util.NoSuchElementException;
 import java.util.concurrent.*;
 
-public abstract class AbstractActor {
+public abstract class Actor {
     private Executor excecutor = ForkJoinPool.commonPool();
-    protected State state = State.CREATED;
-    private Throwable completionException;
-    private int blockedCount = 0;
+    private State state = State.CREATED;
+    private int blocked = 0;
     /**
      * blocked initially and when running.
      */
     private Port controlPort = new Port();
-
-    public synchronized boolean isCompleted() {
-        return state == State.COMPLETED;
-    }
 
     private void fire() {
         controlPort.block();
@@ -33,25 +33,26 @@ public abstract class AbstractActor {
         controlPort.unBlock();
     }
 
-    protected abstract void whenNext();
+    protected abstract void run();
 
-    protected synchronized void whenComplete() {
-        state = State.COMPLETED;
+    public boolean isCompleted() {
+        return state == State.COMPLETED;
     }
-    protected synchronized void whenError(Throwable throwable) {
-        if (state == State.COMPLETED) {
-            return;
+
+    protected synchronized void atComplete() {
+        state = State.COMPLETED;
+        notifyAll();
+    }
+
+    public synchronized void join(long timeout0) throws InterruptedException, TimeoutException {
+        long timeout = timeout0;
+        long targetTime = System.currentTimeMillis() + timeout;
+        while (state!=State.COMPLETED && timeout > 0) {
+            wait(timeout);
+            timeout = targetTime - System.currentTimeMillis();
         }
-        state = State.COMPLETED;
-        completionException = throwable;
-    }
-
-    protected void run() {
-        try {
-            whenNext();
-            restart();
-        } catch (Throwable err) {
-            whenError(err);
+        if (state!=State.COMPLETED) {
+            throw new TimeoutException();
         }
     }
 
@@ -65,8 +66,8 @@ public abstract class AbstractActor {
         boolean ready = false;
 
         public Port() {
-            synchronized (AbstractActor.this) {
-                blockedCount++;
+            synchronized (Actor.this) {
+                blocked++;
             }
         }
 
@@ -74,10 +75,11 @@ public abstract class AbstractActor {
          * under synchronized (Actor.this)
          */
         protected void block() {
-            if (ready) {
-                blockedCount++;
-                ready = false;
+            if (!ready) {
+                return;
             }
+            ready = false;
+            blocked++;
         }
 
         protected void unBlock() {
@@ -85,130 +87,113 @@ public abstract class AbstractActor {
                 return;
             }
             ready = true;
-            blockedCount--;
-            if (blockedCount >0) {
-                return;
-            }
-            fire();
-        }
-    }
-
-    public synchronized void join(long timeout, TimeUnit unit) throws InterruptedException, TimeoutException {
-        join(unit.toMillis(timeout));
-    }
-
-    public synchronized void join(long timeout) throws InterruptedException, TimeoutException {
-        long targetTime = System.currentTimeMillis() + timeout;
-        while (state!=State.COMPLETED) {
-            wait(timeout);
-            timeout = targetTime - System.currentTimeMillis();
-            if (timeout < 0) {
-                throw new TimeoutException();
+            blocked--;
+            if (blocked == 0) {
+                fire();
             }
         }
     }
 
+    public class AsyncSemaPort extends Port implements AsyncSema {
+        private long permissions = 0;
 
-    class OutPort<T> extends Port implements Flow.Publisher<T>, Flow.Subscription {
-        Flow.Subscriber<? super T> subscriber;
-        int requested=0;
+        public AsyncSemaPort(long permissions) {
+            this.permissions = permissions;
+        }
 
-        @Override
-        public void subscribe(Flow.Subscriber<? super T> subscriber) {
-            if (subscriber == null) {
-                throw new NullPointerException();
-            }
-            if (this.subscriber != null) {
-                subscriber.onError(new IllegalStateException());
-            }
-            this.subscriber = subscriber;
-            subscriber.onSubscribe(this);
+        public AsyncSemaPort() {
         }
 
         @Override
-        public synchronized void request(long n) {
-            if (subscriber == null) {
-                return;
-            }
+        public synchronized void release(long n) {
             if (n <= 0) {
-                subscriber.onError(new IllegalArgumentException());
-                return;
+                throw new IllegalArgumentException();
             }
-            boolean doUnBlock = requested==0;
-            requested+=n;
+            boolean doUnBlock = permissions == 0;
+            permissions += n;
+            if (permissions < 0) { // overflow
+                permissions = Long.MAX_VALUE;
+            }
             if (doUnBlock) {
                 unBlock();
             }
         }
 
-        @Override
-        public synchronized void cancel() {
-            if (subscriber == null) {
-                return;
+        public synchronized void aquire(long delta) {
+            if (delta <= 0) {
+                throw new IllegalArgumentException();
             }
-            subscriber = null;
+            long newPermissionsValue = permissions-delta;
+            if (newPermissionsValue < 0) {
+                throw new IllegalArgumentException();
+            }
+            permissions = newPermissionsValue;
+            if (permissions == 0) {
+                block();
+            }
         }
 
-        public void onNext(T item) {
-            synchronized (AbstractActor.this) {
-                if (subscriber == null) {
-                    return;
-                }
-                if (requested == 0) {
-                    subscriber.onError(new IllegalStateException());
-                }
-                requested--;
-                if (requested == 0) {
-                    block();
-                }
-            }
-            subscriber.onNext(item);
-        }
-
-        public void onComplete() {
-            synchronized (AbstractActor.this) {
-                if (subscriber == null) {
-                    throw new IllegalStateException();
-                }
-            }
-            subscriber.onComplete();
-        }
-
-        public void onError(Throwable throwable) {
-            synchronized (AbstractActor.this) {
-                if (subscriber == null) {
-                    throw new IllegalStateException();
-                }
-            }
-            subscriber.onError(throwable);
+        public void aquire() {
+            aquire(1);
         }
     }
 
-    class InPort<T> extends Port implements Flow.Subscriber<T>  {
-        private Flow.Subscription subscription;
+    public class InPort<T> extends Port implements Subscriber<T> {
+        protected Subscription subscription;
         private T item;
-        private boolean completed;
-        private Throwable completionException = null;
+        protected boolean completeSignalled;
+        protected Throwable completionException = null;
+
+        protected T current() {
+            return item;
+        }
 
         @Override
-        public void onSubscribe(Flow.Subscription subscription) {
-
+        public void onSubscribe(Subscription subscription) {
             if (this.subscription != null) {
                 subscription.cancel();
                 return;
             }
             this.subscription = subscription;
-            subscription.request(1);
+        }
+
+        public T poll() {
+            synchronized (Actor.this) {
+                T res = item;
+                item = null;
+                if (!completeSignalled) {
+                    block();
+                }
+                return res;
+            }
+        }
+
+        public T remove() {
+            synchronized (Actor.this) {
+                T res = item;
+                item = null;
+                if (res == null) {
+                    if (completeSignalled) {
+                        throw new NoSuchElementException(); // better should be CompletionException(
+                    } else {
+                        throw new RuntimeException("Internal error");
+                    }
+                }
+                if (!completeSignalled) {
+                    block();
+                }
+                return res;
+            }
         }
 
         @Override
         public void onNext(T item) {
-            synchronized (AbstractActor.this) {
-                if (completed) {
+            if (item == null) {
+                throw new NullPointerException();
+            }
+            synchronized (Actor.this) {
+                if (completeSignalled) {
                     return;
-                }
-                if (item == null) {
-                    throw new NullPointerException();
                 }
                 this.item = item;
                 unBlock();
@@ -217,14 +202,14 @@ public abstract class AbstractActor {
 
         @Override
         public void onError(Throwable throwable) {
-            synchronized (AbstractActor.this) {
-                if (completed) {
+            synchronized (Actor.this) {
+                if (completeSignalled) {
                     return;
                 }
                 if (throwable == null) {
                     throw new NullPointerException();
                 }
-                completed = true;
+                completeSignalled = true;
                 completionException = throwable;
                 unBlock();
             }
@@ -232,43 +217,113 @@ public abstract class AbstractActor {
 
         @Override
         public void onComplete() {
-            synchronized (AbstractActor.this) {
-                if (completed) {
+            synchronized (Actor.this) {
+                if (completeSignalled) {
                     return;
                 }
-                completed = true;
-                if (item == null) {
-                    state = State.COMPLETED;
-                    AbstractActor.this.notifyAll();
-                }
+                completeSignalled = true;
                 unBlock();
             }
         }
 
         public boolean isCompleted() {
-            return state == State.COMPLETED;
+            return item==null && state == State.COMPLETED;
         }
 
         public Throwable getCompletionException() {
             return completionException;
         }
+    }
 
-        public T poll() {
-            T res;
-            synchronized (AbstractActor.this) {
-                if (item == null || subscription == null) {
-                    throw new IllegalStateException();
+    public class ReactiveInPort<T> extends InPort<T> {
+
+        @Override
+        public void onSubscribe(Subscription subscription) {
+            super.onSubscribe(subscription);
+            request(1);
+        }
+
+        public void request(long n) {
+            subscription.request(n);
+        }
+
+        @Override
+        public T remove() {
+            T res = super.remove();
+            request(1);
+            return res;
+        }
+    }
+
+    public class OutPort<T> implements Publisher<T>, Subscription {
+        InPort<Subscriber<? super T>> subscriberPort = new InPort<>();
+
+        @Override
+        public void subscribe(Subscriber<? super T> subscriber) {
+            if (subscriber == null) {
+                subscriber.onError(new NullPointerException());
+                return;
+            }
+            this.subscriberPort.onNext(subscriber);
+            subscriber.onSubscribe(this);
+        }
+
+        public void request(long n) {
+            // do nothing
+        }
+
+        @Override
+        public void cancel() {
+            subscriberPort.poll();
+        }
+
+        public void onNext(T item) {
+            subscriberPort.current().onNext(item);
+        }
+
+        public void onComplete() {
+            subscriberPort.current().onComplete();
+        }
+
+        public void onError(Throwable throwable) {
+            subscriberPort.current().onError(throwable);
+        }
+    }
+
+    public class ReactiveOutPort<T> extends OutPort<T> {
+        AsyncSemaPort sema = new AsyncSemaPort();
+
+        @Override
+        public void request(long n) {
+            Subscriber<? super T> subscriber;
+            synchronized (Actor.this) {
+                subscriber = subscriberPort.current();
+                if (subscriber == null) {
+                    return;
                 }
-                res = item;
-                item = null;
-                subscription.request(1);
-                block();
-                if (completed) {
-                    state =  State.COMPLETED;
-                    AbstractActor.this.notifyAll();
+                try {
+                    sema.release(n);
+                } catch (IllegalArgumentException e) {
+                    subscriber.onError(e);
                 }
             }
-            return res;
+        }
+
+        public void onNext(T item) {
+            Subscriber<? super T> subscriber;
+            synchronized (Actor.this) {
+                subscriber = subscriberPort.current();
+                if (subscriber == null) {
+                    return;
+                }
+                try {
+                    sema.aquire();
+                } catch (IllegalArgumentException e) {
+                    subscriber.onError(e);
+                    return;
+                }
+            }
+            subscriber.onNext(item);
         }
     }
 }
