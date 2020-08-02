@@ -1,16 +1,17 @@
 package org.df4j.flowactors;
 
-import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
+import  java.util.concurrent.Flow.Publisher;
+import  java.util.concurrent.Flow.Subscriber;
+import  java.util.concurrent.Flow.Subscription;
 
 import java.util.NoSuchElementException;
 import java.util.concurrent.*;
 
-public abstract class Actor {
+public abstract class AbstractActor {
     private Executor excecutor = ForkJoinPool.commonPool();
     private State state = State.CREATED;
     private int blocked = 0;
+    Throwable completionException = null;
     /**
      * blocked initially and when running.
      */
@@ -30,29 +31,49 @@ public abstract class Actor {
     }
 
     protected synchronized void restart() {
-        controlPort.unBlock();
+        if (!isCompleted()) {
+            controlPort.unBlock();
+        }
     }
 
-    protected abstract void run();
+    protected abstract void turn() throws Throwable;
 
-    public boolean isCompleted() {
+
+    public synchronized boolean isCompleted() {
         return state == State.COMPLETED;
     }
 
-    protected synchronized void atComplete() {
+    protected synchronized void complete() {
         state = State.COMPLETED;
         notifyAll();
+    }
+
+    protected synchronized void completExceptionally(Throwable throwable) {
+        completionException = throwable;
+        state = State.COMPLETED;
+        notifyAll();
+    }
+
+    protected void run() {
+        try {
+            turn();
+        } catch (Throwable throwable) {
+            completExceptionally(throwable);
+        }
     }
 
     public synchronized void join(long timeout0) throws InterruptedException, TimeoutException {
         long timeout = timeout0;
         long targetTime = System.currentTimeMillis() + timeout;
-        while (state!=State.COMPLETED && timeout > 0) {
+        while (state!=State.COMPLETED) {
+            if (timeout <= 0) {
+                throw new TimeoutException();
+            }
             wait(timeout);
             timeout = targetTime - System.currentTimeMillis();
         }
-        if (state!=State.COMPLETED) {
-            throw new TimeoutException();
+        if (completionException != null) {
+            throw new CompletionException(completionException);
         }
     }
 
@@ -66,7 +87,7 @@ public abstract class Actor {
         boolean ready = false;
 
         public Port() {
-            synchronized (Actor.this) {
+            synchronized (AbstractActor.this) {
                 blocked++;
             }
         }
@@ -158,7 +179,7 @@ public abstract class Actor {
         }
 
         public T poll() {
-            synchronized (Actor.this) {
+            synchronized (AbstractActor.this) {
                 T res = item;
                 item = null;
                 if (!completeSignalled) {
@@ -169,7 +190,7 @@ public abstract class Actor {
         }
 
         public T remove() {
-            synchronized (Actor.this) {
+            synchronized (AbstractActor.this) {
                 T res = item;
                 item = null;
                 if (res == null) {
@@ -191,7 +212,7 @@ public abstract class Actor {
             if (item == null) {
                 throw new NullPointerException();
             }
-            synchronized (Actor.this) {
+            synchronized (AbstractActor.this) {
                 if (completeSignalled) {
                     return;
                 }
@@ -202,7 +223,7 @@ public abstract class Actor {
 
         @Override
         public void onError(Throwable throwable) {
-            synchronized (Actor.this) {
+            synchronized (AbstractActor.this) {
                 if (completeSignalled) {
                     return;
                 }
@@ -217,7 +238,7 @@ public abstract class Actor {
 
         @Override
         public void onComplete() {
-            synchronized (Actor.this) {
+            synchronized (AbstractActor.this) {
                 if (completeSignalled) {
                     return;
                 }
@@ -227,7 +248,11 @@ public abstract class Actor {
         }
 
         public boolean isCompleted() {
-            return item==null && state == State.COMPLETED;
+            return item==null && completeSignalled;
+        }
+
+        public boolean isCompletedExceptionally() {
+            return item==null && completeSignalled && completionException != null;
         }
 
         public Throwable getCompletionException() {
@@ -245,6 +270,13 @@ public abstract class Actor {
 
         public void request(long n) {
             subscription.request(n);
+        }
+
+        @Override
+        public T poll() {
+            T res = super.poll();
+            request(1);
+            return res;
         }
 
         @Override
@@ -296,7 +328,7 @@ public abstract class Actor {
         @Override
         public void request(long n) {
             Subscriber<? super T> subscriber;
-            synchronized (Actor.this) {
+            synchronized (AbstractActor.this) {
                 subscriber = subscriberPort.current();
                 if (subscriber == null) {
                     return;
@@ -311,7 +343,7 @@ public abstract class Actor {
 
         public void onNext(T item) {
             Subscriber<? super T> subscriber;
-            synchronized (Actor.this) {
+            synchronized (AbstractActor.this) {
                 subscriber = subscriberPort.current();
                 if (subscriber == null) {
                     return;

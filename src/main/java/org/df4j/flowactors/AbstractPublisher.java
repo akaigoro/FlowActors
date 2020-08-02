@@ -1,21 +1,23 @@
 package org.df4j.flowactors;
 
-import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscriber;
+import  java.util.concurrent.Flow.Publisher;
+import  java.util.concurrent.Flow.Subscriber;
 
 /**
  * minimalistic {@link Publisher} implementation.
  * Only one subscriber can subscribe.
  * @param <T> type of produced data
  */
-public abstract class AbstractPublisher<T> extends Actor implements Publisher<T>{
+public abstract class AbstractPublisher<T> extends AbstractActor implements Publisher<T>{
     protected ReactiveOutPort<T> outPort = new ReactiveOutPort<>();
 
-    protected void atComplete() {
-        super.atComplete();
+    protected synchronized void complete() {
+        super.complete();
         outPort.onComplete();
     }
-    protected void atError(Throwable throwable) {
+
+    protected synchronized void completExceptionally(Throwable throwable) {
+        super.completExceptionally(throwable);
         outPort.onError(throwable);
     }
 
@@ -24,22 +26,18 @@ public abstract class AbstractPublisher<T> extends Actor implements Publisher<T>
         outPort.subscribe(subscriber);
     }
 
-    protected abstract T atNext()  throws Throwable;
+    protected abstract T whenNext()  throws Throwable;
 
     /** generates one data item
      */
     @Override
-    protected void run() {
-        try {
-            T res = atNext();
-            if (res==null) {
-                atComplete();
-            } else {
-                outPort.onNext(res);
-                restart();
-            }
-        } catch (Throwable throwable) {
-            atError(throwable);
+    protected void turn() throws Throwable {
+        T res = whenNext();
+        if (res == null) {
+            complete();
+        } else {
+            outPort.onNext(res);
+            restart();
         }
     }
 }

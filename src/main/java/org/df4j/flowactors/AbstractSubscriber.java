@@ -1,11 +1,11 @@
 package org.df4j.flowactors;
 
-import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
+import  java.util.concurrent.Flow.Subscriber;
+import  java.util.concurrent.Flow.Subscription;
 
 import java.util.NoSuchElementException;
 
-public abstract class AbstractSubscriber<T> extends Actor implements Subscriber<T> {
+public abstract class AbstractSubscriber<T> extends AbstractActor implements Subscriber<T> {
     protected ReactiveInPort<T> inPort = new ReactiveInPort<>();
 
     @Override
@@ -28,36 +28,27 @@ public abstract class AbstractSubscriber<T> extends Actor implements Subscriber<
         inPort.onComplete();
     }
 
-    protected abstract void atNext(T item) throws Throwable;
-    protected void atError(Throwable throwable) {
-        throwable.printStackTrace();
-    }
+    protected abstract void whenNext(T item) throws Throwable;
+
+    protected void whenComplete() {}
+
+    protected void whenError(Throwable throwable) {}
 
     /** processes one data item
      */
     @Override
-    protected void run() {
-        T item;
-        try {
-            item = inPort.remove();
-        } catch (NoSuchElementException throwable) {
-            if (!inPort.isCompleted()) {
-                throw new RuntimeException("Internal error");
+    protected void turn() throws Throwable {
+        if (inPort.isCompletedExceptionally()) {
+            whenError(inPort.getCompletionException());
+        } else  if (inPort.isCompleted()) {
+            whenComplete();
+        } else {
+            T item = inPort.poll();
+            if (item==null) {
+                throw new RuntimeException();
             }
-            Throwable thr = inPort.getCompletionException();
-            if (thr == null) {
-                atComplete();
-            } else {
-                atError(thr);
-            }
-            return;
+            whenNext(item);
+            restart();
         }
-        try {
-            atNext(item);
-        } catch (Throwable throwable) {
-            atError(throwable);
-            return;
-        }
-        restart();
     }
 }

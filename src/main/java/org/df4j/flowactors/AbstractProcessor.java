@@ -1,18 +1,17 @@
 package org.df4j.flowactors;
 
-import java.util.NoSuchElementException;
-
-import org.reactivestreams.Processor;
-import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscription;
+import java.util.concurrent.Flow;
+import  java.util.concurrent.Flow.Processor;
+import  java.util.concurrent.Flow.Subscription;
 
 /**
  * To make concrete processor, the method {@link AbstractProcessor##atNext(Object)} need to be implemented
  * @param <T> type of processed data
  * @param <R> type of produced data
  */
-public abstract class AbstractProcessor<T, R> extends AbstractPublisher<R> implements Processor<T, R> {
+public abstract class AbstractProcessor<T, R> extends AbstractActor implements Processor<T, R>, Flow.Publisher<R> {
     protected ReactiveInPort<T> inPort = new ReactiveInPort<>();
+    protected ReactiveOutPort<R> outPort = new ReactiveOutPort<>();
 
     @Override
     public void onSubscribe(Subscription subscription) {
@@ -34,9 +33,19 @@ public abstract class AbstractProcessor<T, R> extends AbstractPublisher<R> imple
         inPort.onComplete();
     }
 
+    protected synchronized void complete() {
+        super.complete();
+        outPort.onComplete();
+    }
+
+    protected synchronized void completExceptionally(Throwable throwable) {
+        super.completExceptionally(throwable);
+        outPort.onError(throwable);
+    }
+
     @Override
-    protected R atNext() {
-        throw new UnsupportedOperationException();
+    public void subscribe(Flow.Subscriber<? super R> subscriber) {
+        outPort.subscribe(subscriber);
     }
 
     /**
@@ -45,36 +54,29 @@ public abstract class AbstractProcessor<T, R> extends AbstractPublisher<R> imple
      * @return processed data
      * @throws Throwable if something went wrong
      */
-    protected abstract R atNext(T item)  throws Throwable;
+    protected abstract R whenNext(T item)  throws Throwable;
+
+    protected void whenComplete() {}
+
+    protected void whenError(Throwable throwable) {}
 
     /** processes one data item
      */
     @Override
-    protected void run() {
-        T item;
-        try {
-            item = inPort.remove();
-        } catch (NoSuchElementException throwable) {
-            Throwable thr = inPort.getCompletionException();
-            if (thr == null) {
-                atComplete();
-            } else {
-                atError(thr);
-            }
-            return;
-        }
-        R res;
-        try {
-            res = atNext(item);
-        } catch (Throwable throwable) {
-            atError(throwable);
-            return;
-        }
-        if (res == null) {
-            atComplete();
+    protected void turn() throws Throwable {
+        if (inPort.isCompletedExceptionally()) {
+            whenError(inPort.getCompletionException());
+        } else  if (inPort.isCompleted()) {
+            whenComplete();
         } else {
-            outPort.onNext(res);
-            restart();
+            T item = inPort.poll();
+            R res = whenNext(item);
+            if (res == null) {
+                complete();
+            } else {
+                outPort.onNext(res);
+                restart();
+            }
         }
     }
 }

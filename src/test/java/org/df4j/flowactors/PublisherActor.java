@@ -17,7 +17,7 @@ public class PublisherActor extends AbstractPublisher<Long> {
     }
 
     @Override
-    protected Long atNext() throws Throwable {
+    protected Long whenNext() throws Throwable {
         Thread.sleep(delay);
         if (cnt == 0) {
             logger.info("sent: completed");

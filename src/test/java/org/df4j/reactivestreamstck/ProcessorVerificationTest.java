@@ -2,11 +2,12 @@ package org.df4j.reactivestreamstck;
 
 import org.df4j.flowactors.ProcessorActor;
 import org.df4j.flowactors.PublisherActor;
-import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscriber;
 import org.reactivestreams.tck.TestEnvironment;
 
-public class ProcessorVerificationTest extends org.reactivestreams.tck.PublisherVerification<Long> {
+import  java.util.concurrent.Flow.Publisher;
+import  java.util.concurrent.Flow.Subscriber;
+
+public class ProcessorVerificationTest extends org.reactivestreams.tck.flow.FlowPublisherVerification<Long> {
     static final long defaultTimeout = 400;
 
     public ProcessorVerificationTest() {
@@ -14,7 +15,7 @@ public class ProcessorVerificationTest extends org.reactivestreams.tck.Publisher
     }
 
     @Override
-    public Publisher<Long> createPublisher(long elements) {
+    public Publisher<Long> createFlowPublisher(long elements) {
         PublisherActor publisher = new PublisherActor(elements);
         ProcessorActor processor = new ProcessorActor(0);
         publisher.subscribe(processor);
@@ -24,7 +25,7 @@ public class ProcessorVerificationTest extends org.reactivestreams.tck.Publisher
     }
 
     @Override
-    public Publisher<Long> createFailedPublisher() {
+    public Publisher<Long> createFailedFlowPublisher() {
         MyFailedPublisherActor actor = new MyFailedPublisherActor();
         actor.start();
         return actor;
@@ -43,7 +44,7 @@ public class ProcessorVerificationTest extends org.reactivestreams.tck.Publisher
         }
 
         @Override
-        protected Long atNext() {
+        protected Long whenNext() {
             throw new RuntimeException();
         }
     }
