@@ -1,6 +1,6 @@
 package org.df4j.reactivestreamstck;
 
-import org.df4j.flowactors.PublisherActor;
+import org.df4j.reactiveactors.PublisherActor;
 import java.util.concurrent.Flow.Publisher;
 import java.util.concurrent.Flow.Subscriber;
 import org.reactivestreams.tck.TestEnvironment;

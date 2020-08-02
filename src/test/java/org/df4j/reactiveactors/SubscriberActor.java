@@ -1,32 +1,30 @@
-package org.df4j.flowactors;
+package org.df4j.reactiveactors;
 
 import java.util.logging.Logger;
 
-public class ProcessorActor extends AbstractProcessor<Long,Long> {
-    Logger logger = Logger.getLogger("processor");
+public class SubscriberActor extends AbstractSubscriber<Long> {
+    Logger logger = Logger.getLogger("consumer");
     final int delay;
 
-    public ProcessorActor(int delay) {
+    public SubscriberActor(int delay) {
         this.delay = delay;
     }
 
     @Override
-    protected Long whenNext(Long item) {
+    protected void whenNext(Long item) throws InterruptedException {
+        Thread.sleep(delay);
         if (Math.abs(item) < 100 || item%10 == 0) {
             logger.info("  got:"+item);
         }
-        return item;
     }
 
     @Override
     public void whenComplete() {
-        super.complete();
         logger.info("  got: completed.");
     }
 
     @Override
-    public void completExceptionally(Throwable throwable) {
-        super.completExceptionally(throwable);
+    public void whenError(Throwable throwable) {
         logger.info(" completed with error:"+throwable);
     }
 }

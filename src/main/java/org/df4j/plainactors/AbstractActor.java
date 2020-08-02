@@ -1,11 +1,13 @@
-package org.df4j.flowactors;
-
-import  java.util.concurrent.Flow.Publisher;
-import  java.util.concurrent.Flow.Subscriber;
-import  java.util.concurrent.Flow.Subscription;
+package org.df4j.plainactors;
 
 import java.util.NoSuchElementException;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Flow.Publisher;
+import java.util.concurrent.Flow.Subscriber;
+import java.util.concurrent.Flow.Subscription;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.TimeoutException;
 
 public abstract class AbstractActor {
     private Executor excecutor = ForkJoinPool.commonPool();
@@ -65,7 +67,7 @@ public abstract class AbstractActor {
     public synchronized void join(long timeout0) throws InterruptedException, TimeoutException {
         long timeout = timeout0;
         long targetTime = System.currentTimeMillis() + timeout;
-        while (state!=State.COMPLETED) {
+        while (state!= State.COMPLETED) {
             if (timeout <= 0) {
                 throw new TimeoutException();
             }
@@ -115,17 +117,16 @@ public abstract class AbstractActor {
         }
     }
 
-    public class AsyncSemaPort extends Port implements AsyncSema {
+    public class AsyncSemaPort extends Port {
         private long permissions = 0;
 
         public AsyncSemaPort(long permissions) {
-            this.permissions = permissions;
+            release(permissions);
         }
 
         public AsyncSemaPort() {
         }
 
-        @Override
         public synchronized void release(long n) {
             if (n <= 0) {
                 throw new IllegalArgumentException();
@@ -165,7 +166,7 @@ public abstract class AbstractActor {
         protected boolean completeSignalled;
         protected Throwable completionException = null;
 
-        protected T current() {
+        public T current() {
             return item;
         }
 
@@ -216,6 +217,9 @@ public abstract class AbstractActor {
                 if (completeSignalled) {
                     return;
                 }
+                if (this.item != null) {
+                    throw new IllegalStateException();
+                }
                 this.item = item;
                 unBlock();
             }
@@ -260,35 +264,8 @@ public abstract class AbstractActor {
         }
     }
 
-    public class ReactiveInPort<T> extends InPort<T> {
-
-        @Override
-        public void onSubscribe(Subscription subscription) {
-            super.onSubscribe(subscription);
-            request(1);
-        }
-
-        public void request(long n) {
-            subscription.request(n);
-        }
-
-        @Override
-        public T poll() {
-            T res = super.poll();
-            request(1);
-            return res;
-        }
-
-        @Override
-        public T remove() {
-            T res = super.remove();
-            request(1);
-            return res;
-        }
-    }
-
     public class OutPort<T> implements Publisher<T>, Subscription {
-        InPort<Subscriber<? super T>> subscriberPort = new InPort<>();
+        protected InPort<Subscriber<? super T>> subscriberPort = new InPort<>();
 
         @Override
         public void subscribe(Subscriber<? super T> subscriber) {
@@ -319,43 +296,6 @@ public abstract class AbstractActor {
 
         public void onError(Throwable throwable) {
             subscriberPort.current().onError(throwable);
-        }
-    }
-
-    public class ReactiveOutPort<T> extends OutPort<T> {
-        AsyncSemaPort sema = new AsyncSemaPort();
-
-        @Override
-        public void request(long n) {
-            Subscriber<? super T> subscriber;
-            synchronized (AbstractActor.this) {
-                subscriber = subscriberPort.current();
-                if (subscriber == null) {
-                    return;
-                }
-                try {
-                    sema.release(n);
-                } catch (IllegalArgumentException e) {
-                    subscriber.onError(e);
-                }
-            }
-        }
-
-        public void onNext(T item) {
-            Subscriber<? super T> subscriber;
-            synchronized (AbstractActor.this) {
-                subscriber = subscriberPort.current();
-                if (subscriber == null) {
-                    return;
-                }
-                try {
-                    sema.aquire();
-                } catch (IllegalArgumentException e) {
-                    subscriber.onError(e);
-                    return;
-                }
-            }
-            subscriber.onNext(item);
         }
     }
 }

@@ -1,9 +1,7 @@
-package org.df4j.flowactors;
+package org.df4j.reactiveactors;
 
 import  java.util.concurrent.Flow.Subscriber;
 import  java.util.concurrent.Flow.Subscription;
-
-import java.util.NoSuchElementException;
 
 public abstract class AbstractSubscriber<T> extends AbstractActor implements Subscriber<T> {
     protected ReactiveInPort<T> inPort = new ReactiveInPort<>();
@@ -39,13 +37,16 @@ public abstract class AbstractSubscriber<T> extends AbstractActor implements Sub
     @Override
     protected void turn() throws Throwable {
         if (inPort.isCompletedExceptionally()) {
-            whenError(inPort.getCompletionException());
+            Throwable completionException = inPort.getCompletionException();
+            completExceptionally(completionException);
+            whenError(completionException);
         } else  if (inPort.isCompleted()) {
+            complete();
             whenComplete();
         } else {
             T item = inPort.poll();
             if (item==null) {
-                throw new RuntimeException();
+                throw new RuntimeException("internal error");
             }
             whenNext(item);
             restart();

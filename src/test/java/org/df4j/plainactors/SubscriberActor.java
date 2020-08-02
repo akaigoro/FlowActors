@@ -1,4 +1,4 @@
-package org.df4j.flowactors;
+package org.df4j.plainactors;
 
 import java.util.logging.Logger;
 
@@ -11,7 +11,8 @@ public class SubscriberActor extends AbstractSubscriber<Long> {
     }
 
     @Override
-    protected void whenNext(Long item) {
+    protected void whenNext(Long item) throws InterruptedException {
+        Thread.sleep(delay);
         if (Math.abs(item) < 100 || item%10 == 0) {
             logger.info("  got:"+item);
         }

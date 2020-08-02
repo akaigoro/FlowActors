@@ -1,6 +1,6 @@
 package org.df4j.reactivestreamstck;
 
-import org.df4j.flowactors.SubscriberActor;
+import org.df4j.reactiveactors.SubscriberActor;
 import  java.util.concurrent.Flow.Subscriber;
 import org.reactivestreams.tck.TestEnvironment;
 
