@@ -1,5 +1,7 @@
 package org.df4j.plainactors;
 
+import org.df4j.reactiveactors.AbstractPublisher;
+
 import java.util.logging.Logger;
 
 public class PublisherActor extends AbstractPublisher<Long> {
@@ -10,6 +12,11 @@ public class PublisherActor extends AbstractPublisher<Long> {
     public PublisherActor(long cnt, int delay) {
         this.cnt = cnt;
         this.delay = delay;
+    }
+
+    @Override
+    protected void init() {
+        outPort = new OutPort<>();
     }
 
     public PublisherActor(long cnt) {

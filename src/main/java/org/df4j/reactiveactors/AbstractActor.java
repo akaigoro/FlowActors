@@ -1,4 +1,4 @@
-package org.df4j.plainactors;
+package org.df4j.reactiveactors;
 
 import java.util.NoSuchElementException;
 import java.util.concurrent.CompletionException;

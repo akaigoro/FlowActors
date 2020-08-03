@@ -1,6 +1,6 @@
 package org.df4j.pipeline;
 
-import org.df4j.plainactors.AbstractSubscriber;
+import org.df4j.reactiveactors.AbstractSubscriber;
 
 import java.util.logging.Logger;
 
@@ -11,6 +11,11 @@ public class SubscriberActor extends AbstractSubscriber<Long> {
 
     public SubscriberActor(int delay) {
         this.delay = delay;
+    }
+
+    @Override
+    protected void init() {
+        inPort = new InPort<>();
     }
 
     @Override

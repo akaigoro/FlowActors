@@ -18,7 +18,7 @@ For Processor, wich is a combination of Publisher and Subscriber, the Actor mode
 This kind of actors are called dataflow actors and first were developed to model hardware processors,
 and later applied to software development, see, for example, [Dataflow Process Networks][6].
 
-The library is very small (<500 lines of code), but passes the [TCK-Flow test suite][3]
+The library is very small (less than 600 lines of code), but passes the [TCK-Flow test suite][3]
 The code was minimized in order to let reader programmer to use it as a starting point for further development.
 As a result, it has some important restrictions: Publisher can serve only one Subscriber at a time;
 Subscriber has room for only one incoming message. 

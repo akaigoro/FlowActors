@@ -1,6 +1,6 @@
 package org.df4j.pipeline;
 
-import org.df4j.plainactors.AbstractPublisher;
+import org.df4j.reactiveactors.AbstractPublisher;
 
 import java.util.logging.Logger;
 
@@ -17,6 +17,11 @@ public class PublisherActor extends AbstractPublisher<Long> {
 
     public PublisherActor(long cnt) {
         this(cnt,0);
+    }
+
+    @Override
+    protected void init() {
+        outPort = new OutPort<>();
     }
 
     @Override
