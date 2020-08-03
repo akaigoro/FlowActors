@@ -9,7 +9,15 @@ import java.util.concurrent.Flow.Subscriber;
  * @param <T> type of produced data
  */
 public abstract class AbstractPublisher<T> extends AbstractActor implements Publisher<T>{
-    protected OutPort<T> outPort = new OutPort<>();
+    protected OutPort<T> outPort;
+
+    protected AbstractPublisher() {
+        init();
+    }
+
+    protected void init() {
+        outPort = new OutPort<>();
+    }
 
     protected synchronized void complete() {
         super.complete();

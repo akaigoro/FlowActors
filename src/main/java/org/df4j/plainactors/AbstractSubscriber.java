@@ -4,7 +4,15 @@ import java.util.concurrent.Flow.Subscriber;
 import java.util.concurrent.Flow.Subscription;
 
 public abstract class AbstractSubscriber<T> extends AbstractActor implements Subscriber<T> {
-    protected InPort<T> inPort = new InPort<>();
+    protected InPort<T> inPort;
+
+    protected AbstractSubscriber() {
+        init();
+    }
+
+    protected void init() {
+        inPort = new InPort<>();
+    }
 
     @Override
     public void onSubscribe(Subscription subscription) {
@@ -37,8 +45,11 @@ public abstract class AbstractSubscriber<T> extends AbstractActor implements Sub
     @Override
     protected void turn() throws Throwable {
         if (inPort.isCompletedExceptionally()) {
-            whenError(inPort.getCompletionException());
+            Throwable completionException = inPort.getCompletionException();
+            completExceptionally(completionException);
+            whenError(completionException);
         } else  if (inPort.isCompleted()) {
+            complete();
             whenComplete();
         } else {
             T item = inPort.poll();

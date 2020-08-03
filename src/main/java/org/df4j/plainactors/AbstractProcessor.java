@@ -10,8 +10,17 @@ import java.util.concurrent.Flow.Subscription;
  * @param <R> type of produced data
  */
 public abstract class AbstractProcessor<T, R> extends AbstractActor implements Processor<T, R>, Flow.Publisher<R> {
-    protected InPort<T> inPort = new InPort<>();
-    protected OutPort<R> outPort = new OutPort<>();
+    protected InPort<T> inPort;
+    protected OutPort<R> outPort;
+
+    protected AbstractProcessor() {
+        init();
+    }
+
+    protected void init() {
+        inPort = new InPort<>();
+        outPort = new OutPort<>();
+    }
 
     @Override
     public void onSubscribe(Subscription subscription) {
