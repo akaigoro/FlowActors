@@ -3,7 +3,7 @@ package org.df4j.pipeline;
 import org.junit.Assert;
 import org.testng.annotations.Test;
 
-public class ProcessorTest {
+public class PipelineTest {
 
     public void testProdCons(int cnt, int delay1, int delay2) throws Exception {
         PublisherActor prod = new PublisherActor(cnt, delay1);
