@@ -26,7 +26,7 @@ public class PublisherActor extends AbstractPublisher<Long> {
 
     @Override
     protected Long whenNext() throws Throwable {
-        sema.aquire();
+        sema.aquire(Long.MAX_VALUE);
         Thread.sleep(delay);
         if (cnt == 0) {
             logger.info("sent: completed");
