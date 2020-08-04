@@ -1,9 +1,5 @@
 package org.df4j.plainactors;
 
-import java.util.concurrent.Flow;
-import java.util.concurrent.Flow.Processor;
-import java.util.concurrent.Flow.Subscription;
-
 /**
  * To make concrete processor, the method {@link AbstractProcessor##atNext(Object)} need to be implemented
  * @param <T> type of processed data
@@ -12,10 +8,6 @@ import java.util.concurrent.Flow.Subscription;
 public abstract class AbstractProcessor<T, R> extends AbstractActor {
     public InPort<T> inPort;
     public OutPort<R> outPort;
-
-    protected AbstractProcessor() {
-        init();
-    }
 
     protected void init() {
         inPort = new InPort<>();
@@ -49,17 +41,22 @@ public abstract class AbstractProcessor<T, R> extends AbstractActor {
     @Override
     protected void turn() throws Throwable {
         if (inPort.isCompletedExceptionally()) {
-            whenError(inPort.getCompletionException());
+            Throwable completionException = inPort.getCompletionException();
+            completExceptionally(completionException);
+            whenError(completionException);
         } else  if (inPort.isCompleted()) {
+            complete();
             whenComplete();
         } else {
             T item = inPort.poll();
+            if (item==null) {
+                throw new RuntimeException();
+            }
             R res = whenNext(item);
             if (res == null) {
                 complete();
             } else {
                 outPort.onNext(res);
-                restart();
             }
         }
     }

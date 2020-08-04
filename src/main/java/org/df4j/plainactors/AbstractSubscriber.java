@@ -1,14 +1,7 @@
 package org.df4j.plainactors;
 
-import java.util.concurrent.Flow.Subscriber;
-import java.util.concurrent.Flow.Subscription;
-
 public abstract class AbstractSubscriber<T> extends AbstractActor {
     public InPort<T> inPort;
-
-    protected AbstractSubscriber() {
-        init();
-    }
 
     protected void init() {
         inPort = new InPort<>();
@@ -37,7 +30,6 @@ public abstract class AbstractSubscriber<T> extends AbstractActor {
                 throw new RuntimeException();
             }
             whenNext(item);
-            restart();
         }
     }
 }

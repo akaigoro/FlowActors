@@ -19,6 +19,12 @@ public abstract class AbstractActor {
      */
     private Port controlPort = new Port();
 
+    protected AbstractActor() {
+        init();
+    }
+
+    protected void init() {}
+
     private void fire() {
         controlPort.block();
         excecutor.execute(this::run);
@@ -38,9 +44,6 @@ public abstract class AbstractActor {
         }
     }
 
-    protected abstract void turn() throws Throwable;
-
-
     public synchronized boolean isCompleted() {
         return state == State.COMPLETED;
     }
@@ -56,9 +59,12 @@ public abstract class AbstractActor {
         notifyAll();
     }
 
+    protected abstract void turn() throws Throwable;
+
     protected void run() {
         try {
             turn();
+            restart();
         } catch (Throwable throwable) {
             completExceptionally(throwable);
         }

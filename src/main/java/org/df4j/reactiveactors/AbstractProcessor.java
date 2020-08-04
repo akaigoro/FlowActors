@@ -1,8 +1,5 @@
 package org.df4j.reactiveactors;
 
-import java.util.concurrent.Flow;
-import java.util.concurrent.Flow.Processor;
-
 /**
  * To make concrete processor, the method {@link AbstractProcessor##atNext(Object)} need to be implemented
  * @param <T> type of processed data

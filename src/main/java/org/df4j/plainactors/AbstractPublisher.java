@@ -1,7 +1,6 @@
 package org.df4j.plainactors;
 
 import java.util.concurrent.Flow.Publisher;
-import java.util.concurrent.Flow.Subscriber;
 
 /**
  * minimalistic {@link Publisher} implementation.
@@ -10,10 +9,6 @@ import java.util.concurrent.Flow.Subscriber;
  */
 public abstract class AbstractPublisher<T> extends AbstractActor {
     public OutPort<T> outPort;
-
-    protected AbstractPublisher() {
-        init();
-    }
 
     protected void init() {
         outPort = new OutPort<>();
@@ -40,7 +35,6 @@ public abstract class AbstractPublisher<T> extends AbstractActor {
             complete();
         } else {
             outPort.onNext(res);
-            restart();
         }
     }
 }
