@@ -1,7 +1,5 @@
 package org.df4j.plainactors;
 
-import org.df4j.reactiveactors.AbstractPublisher;
-
 import java.util.logging.Logger;
 
 public class PublisherActor extends AbstractPublisher<Long> {

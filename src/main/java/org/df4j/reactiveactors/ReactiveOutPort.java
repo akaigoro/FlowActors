@@ -4,7 +4,7 @@ import org.df4j.plainactors.AbstractActor;
 
 import java.util.concurrent.Flow;
 
-public class ReactiveOutPort<T> extends AbstractActor.OutPort<T> {
+public class ReactiveOutPort<T> extends AbstractActor.OutPort<T> implements Flow.Publisher<T> {
     private final AbstractActor actor;
     AbstractActor.AsyncSemaPort sema;
 
@@ -18,6 +18,10 @@ public class ReactiveOutPort<T> extends AbstractActor.OutPort<T> {
     public void request(long n) {
         Flow.Subscriber<? super T> subscriber = subscriberPort.current();
         if (subscriber == null) {
+            return;
+        }
+        if (n <= 0) {
+            subscriber.onError(new IllegalArgumentException());
             return;
         }
         sema.release(n);

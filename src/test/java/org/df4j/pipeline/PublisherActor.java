@@ -1,6 +1,6 @@
 package org.df4j.pipeline;
 
-import org.df4j.reactiveactors.AbstractPublisher;
+import org.df4j.plainactors.AbstractPublisher;
 
 import java.util.logging.Logger;
 
@@ -26,7 +26,7 @@ public class PublisherActor extends AbstractPublisher<Long> {
 
     @Override
     protected Long whenNext() throws Throwable {
-        sema.aquire(Long.MAX_VALUE);
+        sema.aquire(1);
         Thread.sleep(delay);
         if (cnt == 0) {
             logger.info("sent: completed");

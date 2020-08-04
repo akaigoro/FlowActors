@@ -8,8 +8,8 @@ import java.util.concurrent.Flow.Subscriber;
  * Only one subscriber can subscribe.
  * @param <T> type of produced data
  */
-public abstract class AbstractPublisher<T> extends AbstractActor implements Publisher<T>{
-    protected OutPort<T> outPort;
+public abstract class AbstractPublisher<T> extends AbstractActor {
+    public OutPort<T> outPort;
 
     protected AbstractPublisher() {
         init();
@@ -27,11 +27,6 @@ public abstract class AbstractPublisher<T> extends AbstractActor implements Publ
     protected synchronized void completExceptionally(Throwable throwable) {
         super.completExceptionally(throwable);
         outPort.onError(throwable);
-    }
-
-    @Override
-    public void subscribe(Subscriber<? super T> subscriber) {
-        outPort.subscribe(subscriber);
     }
 
     protected abstract T whenNext()  throws Throwable;

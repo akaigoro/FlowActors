@@ -11,9 +11,9 @@ public class PipelineTest {
         ProcessorActor proc2 = new ProcessorActor(delay2);
         SubscriberActor cons = new SubscriberActor(delay2);
         cons.sema=prod.sema;
-        prod.subscribe(proc1);
-        proc1.subscribe(proc2);
-        proc2.subscribe(cons);
+        prod.outPort.subscribe(proc1.inPort);
+        proc1.outPort.subscribe(proc2.inPort);
+        proc2.outPort.subscribe(cons.inPort);
         prod.start();
         proc1.start();
         proc2.start();

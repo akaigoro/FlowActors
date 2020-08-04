@@ -18,10 +18,10 @@ public class ProcessorVerificationTest extends org.reactivestreams.tck.flow.Flow
     public Publisher<Long> createFlowPublisher(long elements) {
         PublisherActor publisher = new PublisherActor(elements);
         ProcessorActor processor = new ProcessorActor(0);
-        publisher.subscribe(processor);
+        publisher.outPort.subscribe(processor.inPort);
         publisher.start();
         processor.start();
-        return processor;
+        return processor.outPort;
     }
 
     @Override
@@ -31,7 +31,7 @@ public class ProcessorVerificationTest extends org.reactivestreams.tck.flow.Flow
         return actor;
     }
 
-    private static class MyFailedPublisherActor extends PublisherActor {
+    private static class MyFailedPublisherActor extends PublisherActor implements Publisher<Long>{
 
         public MyFailedPublisherActor() {
             super(0);
@@ -39,7 +39,7 @@ public class ProcessorVerificationTest extends org.reactivestreams.tck.flow.Flow
 
         @Override
         public void subscribe(Subscriber<? super Long> subscriber) {
-            super.subscribe(subscriber);
+            outPort.subscribe(subscriber);
             subscriber.onError(new IllegalStateException());
         }
 

@@ -9,9 +9,9 @@ import java.util.concurrent.Flow.Subscription;
  * @param <T> type of processed data
  * @param <R> type of produced data
  */
-public abstract class AbstractProcessor<T, R> extends AbstractActor implements Processor<T, R>, Flow.Publisher<R> {
-    protected InPort<T> inPort;
-    protected OutPort<R> outPort;
+public abstract class AbstractProcessor<T, R> extends AbstractActor {
+    public InPort<T> inPort;
+    public OutPort<R> outPort;
 
     protected AbstractProcessor() {
         init();
@@ -22,26 +22,6 @@ public abstract class AbstractProcessor<T, R> extends AbstractActor implements P
         outPort = new OutPort<>();
     }
 
-    @Override
-    public void onSubscribe(Subscription subscription) {
-        inPort.onSubscribe(subscription);
-    }
-
-    @Override
-    public void onNext(T item) {
-        inPort.onNext(item);
-    }
-
-    @Override
-    public void onError(Throwable throwable) {
-        inPort.onError(throwable);
-    }
-
-    @Override
-    public void onComplete() {
-        inPort.onComplete();
-    }
-
     protected synchronized void complete() {
         super.complete();
         outPort.onComplete();
@@ -50,11 +30,6 @@ public abstract class AbstractProcessor<T, R> extends AbstractActor implements P
     protected synchronized void completExceptionally(Throwable throwable) {
         super.completExceptionally(throwable);
         outPort.onError(throwable);
-    }
-
-    @Override
-    public void subscribe(Flow.Subscriber<? super R> subscriber) {
-        outPort.subscribe(subscriber);
     }
 
     /**

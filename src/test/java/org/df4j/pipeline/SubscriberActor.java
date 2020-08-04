@@ -1,6 +1,6 @@
 package org.df4j.pipeline;
 
-import org.df4j.reactiveactors.AbstractSubscriber;
+import org.df4j.plainactors.AbstractSubscriber;
 
 import java.util.logging.Logger;
 

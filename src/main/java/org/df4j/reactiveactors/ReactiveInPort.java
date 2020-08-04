@@ -4,7 +4,7 @@ import org.df4j.plainactors.AbstractActor;
 
 import java.util.concurrent.Flow;
 
-public class ReactiveInPort<T> extends AbstractActor.InPort<T> {
+public class ReactiveInPort<T> extends AbstractActor.InPort<T> implements Flow.Subscriber<T> {
 
     public ReactiveInPort(AbstractActor actor) {
         actor.super();

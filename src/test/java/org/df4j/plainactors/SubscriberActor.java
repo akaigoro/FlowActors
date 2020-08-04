@@ -1,7 +1,5 @@
 package org.df4j.plainactors;
 
-import org.df4j.reactiveactors.AbstractSubscriber;
-
 import java.util.logging.Logger;
 
 public class SubscriberActor extends AbstractSubscriber<Long> {

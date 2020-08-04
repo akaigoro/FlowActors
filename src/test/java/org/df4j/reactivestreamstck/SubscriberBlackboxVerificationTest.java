@@ -18,6 +18,6 @@ public class SubscriberBlackboxVerificationTest extends org.reactivestreams.tck.
 
     @Override
     public Subscriber<Long> createFlowSubscriber() {
-        return new SubscriberActor(0);
+        return new SubscriberActor(0).inPort;
     }
 }

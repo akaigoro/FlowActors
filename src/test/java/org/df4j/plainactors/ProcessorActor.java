@@ -1,7 +1,5 @@
 package org.df4j.plainactors;
 
-import org.df4j.reactiveactors.AbstractProcessor;
-
 import java.util.logging.Logger;
 
 public class ProcessorActor extends AbstractProcessor<Long,Long> {

@@ -8,7 +8,7 @@ public class ProdConsTest {
     public void noFeedBack(int cnt, int delay1, int delay2) throws Exception {
         PublisherActor prod = new PublisherActor(cnt, delay1);
         SubscriberActor cons = new SubscriberActor(delay2);
-        prod.subscribe(cons);
+        prod.outPort.subscribe(cons.inPort);
         prod.start();
         cons.start();
         cons.join(Math.max(delay1, delay2)*cnt+400);

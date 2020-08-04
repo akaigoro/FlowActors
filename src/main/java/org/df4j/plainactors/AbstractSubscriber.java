@@ -3,8 +3,8 @@ package org.df4j.plainactors;
 import java.util.concurrent.Flow.Subscriber;
 import java.util.concurrent.Flow.Subscription;
 
-public abstract class AbstractSubscriber<T> extends AbstractActor implements Subscriber<T> {
-    protected InPort<T> inPort;
+public abstract class AbstractSubscriber<T> extends AbstractActor {
+    public InPort<T> inPort;
 
     protected AbstractSubscriber() {
         init();
@@ -12,26 +12,6 @@ public abstract class AbstractSubscriber<T> extends AbstractActor implements Sub
 
     protected void init() {
         inPort = new InPort<>();
-    }
-
-    @Override
-    public void onSubscribe(Subscription subscription) {
-        inPort.onSubscribe(subscription);
-    }
-
-    @Override
-    public void onNext(T item) {
-        inPort.onNext(item);
-    }
-
-    @Override
-    public void onError(Throwable throwable) {
-        inPort.onError(throwable);
-    }
-
-    @Override
-    public void onComplete() {
-        inPort.onComplete();
     }
 
     protected abstract void whenNext(T item) throws Throwable;
