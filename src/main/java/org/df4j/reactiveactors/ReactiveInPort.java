@@ -10,8 +10,9 @@ public class ReactiveInPort<T> extends AbstractActor.InPort<T> implements Subscr
     public ReactiveInPort(AbstractActor actor) {
         actor.super();
     }
+
     @Override
-    public void onSubscribe(Subscription subscription) {
+    public synchronized void onSubscribe(Subscription subscription) {
         if (this.subscription != null) {
             subscription.cancel();
             return;

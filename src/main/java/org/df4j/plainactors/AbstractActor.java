@@ -22,11 +22,6 @@ public abstract class AbstractActor {
 
     protected void init() {}
 
-    private void fire() {
-        controlPort.block();
-        excecutor.execute(this::run);
-    }
-
     public synchronized void start() {
         if (state != State.CREATED) {
             throw new IllegalStateException();
@@ -38,6 +33,18 @@ public abstract class AbstractActor {
     protected synchronized void restart() {
         if (!isCompleted()) {
             controlPort.unBlock();
+        }
+    }
+
+    private synchronized void incBlockCount() {
+        blocked++;
+    }
+
+    private synchronized void decBlockCount() {
+        blocked--;
+        if (blocked == 0) {
+            controlPort.block();
+            excecutor.execute(this::run);
         }
     }
 
@@ -92,31 +99,23 @@ public abstract class AbstractActor {
         boolean ready = false;
 
         public Port() {
-            synchronized (AbstractActor.this) {
-                blocked++;
-            }
+            incBlockCount();
         }
 
-        /**
-         * under synchronized (Actor.this)
-         */
-        protected void block() {
+        protected synchronized void block() {
             if (!ready) {
                 return;
             }
             ready = false;
-            blocked++;
+            incBlockCount();
         }
 
-        protected void unBlock() {
+        protected synchronized void unBlock() {
             if (ready) {
                 return;
             }
             ready = true;
-            blocked--;
-            if (blocked == 0) {
-                fire();
-            }
+            decBlockCount();
         }
     }
 
