@@ -1,8 +1,9 @@
 package org.df4j.reactiveactors;
 
+import org.df4j.plainactors.AbstractConsumer;
 import org.reactivestreams.Subscriber;
 
-public abstract class AbstractSubscriber<T> extends org.df4j.plainactors.AbstractSubscriber<T> implements Subscriber<T> {
+public abstract class AbstractSubscriber<T> extends AbstractConsumer<T> implements Subscriber<T> {
 
     protected void init() {
         inPort = new ReactiveInPort<>(this);

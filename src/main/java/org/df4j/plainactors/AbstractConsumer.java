@@ -1,6 +1,6 @@
 package org.df4j.plainactors;
 
-public abstract class AbstractSubscriber<T> extends AbstractActor {
+public abstract class AbstractConsumer<T> extends AbstractActor {
     public InPort<T> inPort;
 
     protected void init() {

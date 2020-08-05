@@ -1,5 +1,6 @@
 package org.df4j.reactiveactors;
 
+import org.df4j.plainactors.AbstractProducer;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 
@@ -8,7 +9,7 @@ import org.reactivestreams.Subscriber;
  * Only one subscriber can subscribe.
  * @param <T> type of produced data
  */
-public abstract class AbstractPublisher<T> extends org.df4j.plainactors.AbstractPublisher<T> implements Publisher<T> {
+public abstract class AbstractPublisher<T> extends AbstractProducer<T> implements Publisher<T> {
 
     protected void init() {
         outPort = new ReactiveOutPort<>(this);

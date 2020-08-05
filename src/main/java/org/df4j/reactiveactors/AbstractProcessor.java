@@ -1,5 +1,6 @@
 package org.df4j.reactiveactors;
 
+import org.df4j.plainactors.AbstractTransformer;
 import org.reactivestreams.Processor;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -9,7 +10,7 @@ import org.reactivestreams.Subscription;
  * @param <T> type of processed data
  * @param <R> type of produced data
  */
-public abstract class AbstractProcessor<T, R> extends org.df4j.plainactors.AbstractProcessor<T,R> implements Processor<T,R> {
+public abstract class AbstractProcessor<T, R> extends AbstractTransformer<T,R> implements Processor<T,R> {
 
     protected void init() {
         inPort = new ReactiveInPort<>(this);

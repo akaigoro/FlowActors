@@ -1,11 +1,11 @@
 package org.df4j.plainactors;
 
 /**
- * To make concrete processor, the method {@link AbstractProcessor##atNext(Object)} need to be implemented
+ * To make concrete processor, the method {@link AbstractTransformer##atNext(Object)} need to be implemented
  * @param <T> type of processed data
  * @param <R> type of produced data
  */
-public abstract class AbstractProcessor<T, R> extends AbstractActor {
+public abstract class AbstractTransformer<T, R> extends AbstractActor {
     public InPort<T> inPort;
     public OutMessagePort<R> outPort;
 

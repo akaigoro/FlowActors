@@ -31,7 +31,7 @@ public abstract class AbstractActor {
     }
 
     protected synchronized void restart() {
-        if (!isCompleted()) {
+        if (state != State.COMPLETED) {
             controlPort.unBlock();
         }
     }

@@ -2,13 +2,13 @@ package org.df4j.plainactors;
 
 import java.util.logging.Logger;
 
-public class PublisherActor extends AbstractPublisher<Long> {
+public class ProducerActor extends AbstractProducer<Long> {
     AsyncSemaPort sema = new AsyncSemaPort(1);
     Logger logger = Logger.getLogger("producer");
     final int delay;
     long cnt;
 
-    public PublisherActor(long cnt, int delay) {
+    public ProducerActor(long cnt, int delay) {
         this.cnt = cnt;
         this.delay = delay;
     }

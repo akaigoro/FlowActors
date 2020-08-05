@@ -6,10 +6,10 @@ import org.testng.annotations.Test;
 public class PipelineTest {
 
     public void testProdCons(int cnt, int delay1, int delay2) throws Exception {
-        PublisherActor prod = new PublisherActor(cnt, delay1);
-        ProcessorActor proc1 = new ProcessorActor(delay2);
-        ProcessorActor proc2 = new ProcessorActor(delay2);
-        SubscriberActor cons = new SubscriberActor(delay2);
+        ProducerActor prod = new ProducerActor(cnt, delay1);
+        TransformerActor proc1 = new TransformerActor(delay2);
+        TransformerActor proc2 = new TransformerActor(delay2);
+        ConsumerActor cons = new ConsumerActor(delay2);
         prod.outPort = proc1.inPort;
         proc1.outPort = proc2.inPort;
         proc2.outPort = cons.inPort;

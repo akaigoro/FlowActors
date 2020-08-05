@@ -1,11 +1,11 @@
 package org.df4j.plainactors;
 
 /**
- * minimalistic {@link Publisher} implementation.
+ * minimalistic implementation.
  * Only one subscriber can subscribe.
  * @param <T> type of produced data
  */
-public abstract class AbstractPublisher<R> extends AbstractActor {
+public abstract class AbstractProducer<R> extends AbstractActor {
     public OutMessagePort<R> outPort;
 
     protected synchronized void complete() {
