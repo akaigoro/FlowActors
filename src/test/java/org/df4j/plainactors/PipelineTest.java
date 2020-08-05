@@ -1,4 +1,4 @@
-package org.df4j.pipeline;
+package org.df4j.plainactors;
 
 import org.junit.Assert;
 import org.testng.annotations.Test;
@@ -10,10 +10,10 @@ public class PipelineTest {
         ProcessorActor proc1 = new ProcessorActor(delay2);
         ProcessorActor proc2 = new ProcessorActor(delay2);
         SubscriberActor cons = new SubscriberActor(delay2);
+        prod.outPort = proc1.inPort;
+        proc1.outPort = proc2.inPort;
+        proc2.outPort = cons.inPort;
         cons.sema=prod.sema;
-        prod.outPort.subscribe(proc1.inPort);
-        proc1.outPort.subscribe(proc2.inPort);
-        proc2.outPort.subscribe(cons.inPort);
         prod.start();
         proc1.start();
         proc2.start();

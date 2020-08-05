@@ -2,6 +2,7 @@ package org.df4j.reactivestreamstck;
 
 import org.df4j.reactiveactors.ProcessorActor;
 import org.df4j.reactiveactors.PublisherActor;
+import org.df4j.reactiveactors.ReactiveOutPort;
 import org.reactivestreams.tck.TestEnvironment;
 
 import  java.util.concurrent.Flow.Publisher;
@@ -18,10 +19,10 @@ public class ProcessorVerificationTest extends org.reactivestreams.tck.flow.Flow
     public Publisher<Long> createFlowPublisher(long elements) {
         PublisherActor publisher = new PublisherActor(elements);
         ProcessorActor processor = new ProcessorActor(0);
-        publisher.outPort.subscribe(processor.inPort);
+        publisher.subscribe(processor);
         publisher.start();
         processor.start();
-        return processor.outPort;
+        return processor;
     }
 
     @Override
@@ -31,7 +32,7 @@ public class ProcessorVerificationTest extends org.reactivestreams.tck.flow.Flow
         return actor;
     }
 
-    private static class MyFailedPublisherActor extends PublisherActor implements Publisher<Long>{
+    private static class MyFailedPublisherActor extends PublisherActor{
 
         public MyFailedPublisherActor() {
             super(0);
@@ -39,7 +40,7 @@ public class ProcessorVerificationTest extends org.reactivestreams.tck.flow.Flow
 
         @Override
         public void subscribe(Subscriber<? super Long> subscriber) {
-            outPort.subscribe(subscriber);
+            super.subscribe(subscriber);
             subscriber.onError(new IllegalStateException());
         }
 

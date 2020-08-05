@@ -1,5 +1,8 @@
 package org.df4j.reactiveactors;
 
+import org.df4j.plainactors.OutMessagePort;
+
+import java.util.concurrent.Flow;
 import java.util.logging.Logger;
 
 public class PublisherActor extends AbstractPublisher<Long> {

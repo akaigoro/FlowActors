@@ -18,7 +18,7 @@ public class PublisherVerificationTest extends org.reactivestreams.tck.flow.Flow
     public Publisher<Long> createFlowPublisher(long elements) {
         PublisherActor publisher = new PublisherActor(elements);
         publisher.start();
-        return publisher.outPort;
+        return publisher;
     }
 
     @Override
@@ -37,7 +37,7 @@ public class PublisherVerificationTest extends org.reactivestreams.tck.flow.Flow
 
         @Override
         public void subscribe(Subscriber<? super Long> subscriber) {
-            outPort.subscribe(subscriber);
+            super.subscribe(subscriber);
             subscriber.onError(new IllegalStateException());
         }
 

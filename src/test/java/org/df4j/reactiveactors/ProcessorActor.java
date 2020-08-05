@@ -1,5 +1,6 @@
 package org.df4j.reactiveactors;
 
+import java.util.concurrent.Flow;
 import java.util.logging.Logger;
 
 public class ProcessorActor extends AbstractProcessor<Long,Long> {

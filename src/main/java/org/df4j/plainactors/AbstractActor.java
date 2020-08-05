@@ -3,9 +3,6 @@ package org.df4j.plainactors;
 import java.util.NoSuchElementException;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
-import java.util.concurrent.Flow.Publisher;
-import java.util.concurrent.Flow.Subscriber;
-import java.util.concurrent.Flow.Subscription;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeoutException;
 
@@ -166,23 +163,13 @@ public abstract class AbstractActor {
         }
     }
 
-    public class InPort<T> extends Port implements Subscriber<T> {
-        protected Subscription subscription;
+    public class InPort<T> extends Port implements OutMessagePort<T> {
         private T item;
         protected boolean completeSignalled;
         protected Throwable completionException = null;
 
         public T current() {
             return item;
-        }
-
-        @Override
-        public void onSubscribe(Subscription subscription) {
-            if (this.subscription != null) {
-                subscription.cancel();
-                return;
-            }
-            this.subscription = subscription;
         }
 
         public T poll() {
@@ -270,38 +257,4 @@ public abstract class AbstractActor {
         }
     }
 
-    public class OutPort<T> implements Publisher<T>, Subscription {
-        protected InPort<Subscriber<? super T>> subscriberPort = new InPort<>();
-
-        @Override
-        public void subscribe(Subscriber<? super T> subscriber) {
-            if (subscriber == null) {
-                subscriber.onError(new NullPointerException());
-                return;
-            }
-            this.subscriberPort.onNext(subscriber);
-            subscriber.onSubscribe(this);
-        }
-
-        public void request(long n) {
-            // do nothing
-        }
-
-        @Override
-        public void cancel() {
-            subscriberPort.poll();
-        }
-
-        public void onNext(T item) {
-            subscriberPort.current().onNext(item);
-        }
-
-        public void onComplete() {
-            subscriberPort.current().onComplete();
-        }
-
-        public void onError(Throwable throwable) {
-            subscriberPort.current().onError(throwable);
-        }
-    }
 }

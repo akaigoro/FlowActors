@@ -1,5 +1,6 @@
 package org.df4j.reactiveactors;
 
+import java.util.concurrent.Flow;
 import java.util.logging.Logger;
 
 public class SubscriberActor extends AbstractSubscriber<Long> {
@@ -26,5 +27,10 @@ public class SubscriberActor extends AbstractSubscriber<Long> {
     @Override
     public void whenError(Throwable throwable) {
         logger.info(" completed with error:"+throwable);
+    }
+
+    @Override
+    public void onSubscribe(Flow.Subscription subscription) {
+        getInPort().onSubscribe(subscription);
     }
 }

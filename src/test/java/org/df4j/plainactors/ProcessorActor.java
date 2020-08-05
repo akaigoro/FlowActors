@@ -1,6 +1,4 @@
-package org.df4j.pipeline;
-
-import org.df4j.plainactors.AbstractProcessor;
+package org.df4j.plainactors;
 
 import java.util.logging.Logger;
 
@@ -10,12 +8,6 @@ public class ProcessorActor extends AbstractProcessor<Long,Long> {
 
     public ProcessorActor(int delay) {
         this.delay = delay;
-    }
-
-    @Override
-    protected void init() {
-        inPort = new InPort<>();
-        outPort = new OutPort<>();
     }
 
     @Override

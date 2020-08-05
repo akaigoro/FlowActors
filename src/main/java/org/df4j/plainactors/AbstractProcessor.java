@@ -7,11 +7,18 @@ package org.df4j.plainactors;
  */
 public abstract class AbstractProcessor<T, R> extends AbstractActor {
     public InPort<T> inPort;
-    public OutPort<R> outPort;
+    public OutMessagePort<R> outPort;
 
     protected void init() {
         inPort = new InPort<>();
-        outPort = new OutPort<>();
+    }
+
+    public InPort<T> getInPort() {
+        return inPort;
+    }
+
+    public OutMessagePort<R> getOutPort() {
+        return outPort;
     }
 
     protected synchronized void complete() {

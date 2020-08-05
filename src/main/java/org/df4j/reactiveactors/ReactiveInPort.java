@@ -5,14 +5,18 @@ import org.df4j.plainactors.AbstractActor;
 import java.util.concurrent.Flow;
 
 public class ReactiveInPort<T> extends AbstractActor.InPort<T> implements Flow.Subscriber<T> {
+    protected Flow.Subscription subscription;
 
     public ReactiveInPort(AbstractActor actor) {
         actor.super();
     }
-
     @Override
     public void onSubscribe(Flow.Subscription subscription) {
-        super.onSubscribe(subscription);
+        if (this.subscription != null) {
+            subscription.cancel();
+            return;
+        }
+        this.subscription = subscription;
         request(1);
     }
 

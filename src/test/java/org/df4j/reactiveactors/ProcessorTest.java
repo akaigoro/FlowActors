@@ -9,8 +9,8 @@ public class ProcessorTest {
         PublisherActor prod = new PublisherActor(cnt, delay1);
         ProcessorActor proc = new ProcessorActor(delay2);
         SubscriberActor cons = new SubscriberActor(delay2);
-        prod.outPort.subscribe(proc.inPort);
-        proc.outPort.subscribe(cons.inPort);
+        prod.subscribe(proc);
+        proc.subscribe(cons);
         prod.start();
         proc.start();
         cons.start();

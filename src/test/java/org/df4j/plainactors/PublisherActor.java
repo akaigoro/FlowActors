@@ -3,6 +3,7 @@ package org.df4j.plainactors;
 import java.util.logging.Logger;
 
 public class PublisherActor extends AbstractPublisher<Long> {
+    AsyncSemaPort sema = new AsyncSemaPort(1);
     Logger logger = Logger.getLogger("producer");
     final int delay;
     long cnt;
@@ -13,16 +14,8 @@ public class PublisherActor extends AbstractPublisher<Long> {
     }
 
     @Override
-    protected void init() {
-        outPort = new OutPort<>();
-    }
-
-    public PublisherActor(long cnt) {
-        this(cnt,0);
-    }
-
-    @Override
     protected Long whenNext() throws Throwable {
+        sema.aquire(1);
         Thread.sleep(delay);
         if (cnt == 0) {
             logger.info("sent: completed");
