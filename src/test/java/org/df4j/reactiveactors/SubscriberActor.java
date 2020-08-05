@@ -1,5 +1,7 @@
 package org.df4j.reactiveactors;
 
+import org.reactivestreams.Subscription;
+
 import java.util.logging.Logger;
 
 public class SubscriberActor extends AbstractSubscriber<Long> {
@@ -20,11 +22,18 @@ public class SubscriberActor extends AbstractSubscriber<Long> {
 
     @Override
     public void whenComplete() {
+        super.whenComplete();
         logger.info("  got: completed.");
     }
 
     @Override
     public void whenError(Throwable throwable) {
+        super.whenError(throwable);
         logger.info(" completed with error:"+throwable);
+    }
+
+    @Override
+    public void onSubscribe(Subscription subscription) {
+        getInPort().onSubscribe(subscription);
     }
 }

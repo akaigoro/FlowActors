@@ -1,21 +1,40 @@
 package org.df4j.reactiveactors;
 
-import java.util.concurrent.Flow;
-import  java.util.concurrent.Flow.Processor;
-import  java.util.concurrent.Flow.Subscription;
+import org.df4j.plainactors.AbstractTransformer;
+import org.reactivestreams.Processor;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 
 /**
  * To make concrete processor, the method {@link AbstractProcessor##atNext(Object)} need to be implemented
  * @param <T> type of processed data
  * @param <R> type of produced data
  */
-public abstract class AbstractProcessor<T, R> extends AbstractActor implements Processor<T, R>, Flow.Publisher<R> {
-    protected ReactiveInPort<T> inPort = new ReactiveInPort<>();
-    protected ReactiveOutPort<R> outPort = new ReactiveOutPort<>();
+public abstract class AbstractProcessor<T, R> extends AbstractTransformer<T,R> implements Processor<T,R> {
+
+    protected void init() {
+        inPort = new ReactiveInPort<>(this);
+        outPort = new ReactiveOutPort<>(this);
+    }
+
+    @Override
+    public ReactiveInPort<T> getInPort() {
+        return (ReactiveInPort<T>) super.getInPort();
+    }
+
+    @Override
+    public ReactiveOutPort<R> getOutPort() {
+        return (ReactiveOutPort<R>) super.getOutPort();
+    }
+
+    @Override
+    public void subscribe(Subscriber<? super R> subscriber) {
+        getOutPort().subscribe(subscriber);
+    }
 
     @Override
     public void onSubscribe(Subscription subscription) {
-        inPort.onSubscribe(subscription);
+        getInPort().onSubscribe(subscription);
     }
 
     @Override
@@ -33,51 +52,5 @@ public abstract class AbstractProcessor<T, R> extends AbstractActor implements P
         inPort.onComplete();
     }
 
-    protected synchronized void complete() {
-        super.complete();
-        outPort.onComplete();
-    }
-
-    protected synchronized void completExceptionally(Throwable throwable) {
-        super.completExceptionally(throwable);
-        outPort.onError(throwable);
-    }
-
-    @Override
-    public void subscribe(Flow.Subscriber<? super R> subscriber) {
-        outPort.subscribe(subscriber);
-    }
-
-    /**
-     *
-     * @param item input data
-     * @return processed data
-     * @throws Throwable if something went wrong
-     */
-    protected abstract R whenNext(T item)  throws Throwable;
-
-    protected void whenComplete() {}
-
-    protected void whenError(Throwable throwable) {}
-
-    /** processes one data item
-     */
-    @Override
-    protected void turn() throws Throwable {
-        if (inPort.isCompletedExceptionally()) {
-            whenError(inPort.getCompletionException());
-        } else  if (inPort.isCompleted()) {
-            whenComplete();
-        } else {
-            T item = inPort.poll();
-            R res = whenNext(item);
-            if (res == null) {
-                complete();
-            } else {
-                outPort.onNext(res);
-                restart();
-            }
-        }
-    }
 }
 

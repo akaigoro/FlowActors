@@ -3,9 +3,6 @@ package org.df4j.plainactors;
 import java.util.NoSuchElementException;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
-import java.util.concurrent.Flow.Publisher;
-import java.util.concurrent.Flow.Subscriber;
-import java.util.concurrent.Flow.Subscription;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeoutException;
 
@@ -19,10 +16,11 @@ public abstract class AbstractActor {
      */
     private Port controlPort = new Port();
 
-    private void fire() {
-        controlPort.block();
-        excecutor.execute(this::run);
+    protected AbstractActor() {
+        init();
     }
+
+    protected void init() {}
 
     public synchronized void start() {
         if (state != State.CREATED) {
@@ -33,34 +31,46 @@ public abstract class AbstractActor {
     }
 
     protected synchronized void restart() {
-        if (!isCompleted()) {
+        if (state != State.COMPLETED) {
             controlPort.unBlock();
         }
     }
 
-    protected abstract void turn() throws Throwable;
+    private synchronized void incBlockCount() {
+        blocked++;
+    }
 
+    private synchronized void decBlockCount() {
+        blocked--;
+        if (blocked == 0) {
+            controlPort.block();
+            excecutor.execute(this::run);
+        }
+    }
 
     public synchronized boolean isCompleted() {
         return state == State.COMPLETED;
     }
 
-    protected synchronized void complete() {
+    protected synchronized void whenComplete() {
         state = State.COMPLETED;
         notifyAll();
     }
 
-    protected synchronized void completExceptionally(Throwable throwable) {
+    protected synchronized void whenError(Throwable throwable) {
         completionException = throwable;
         state = State.COMPLETED;
         notifyAll();
     }
 
-    protected void run() {
+    protected abstract void turn() throws Throwable;
+
+    private void run() {
         try {
             turn();
+            restart();
         } catch (Throwable throwable) {
-            completExceptionally(throwable);
+            whenError(throwable);
         }
     }
 
@@ -86,34 +96,26 @@ public abstract class AbstractActor {
     }
 
     class Port {
-        boolean ready = false;
+        private boolean isBlocked = true;
 
         public Port() {
-            synchronized (AbstractActor.this) {
-                blocked++;
-            }
+            incBlockCount();
         }
 
-        /**
-         * under synchronized (Actor.this)
-         */
-        protected void block() {
-            if (!ready) {
+        protected synchronized void block() {
+            if (isBlocked) {
                 return;
             }
-            ready = false;
-            blocked++;
+            isBlocked = true;
+            incBlockCount();
         }
 
-        protected void unBlock() {
-            if (ready) {
+        protected synchronized void unBlock() {
+            if (!isBlocked) {
                 return;
             }
-            ready = true;
-            blocked--;
-            if (blocked == 0) {
-                fire();
-            }
+            isBlocked = false;
+            decBlockCount();
         }
     }
 
@@ -160,8 +162,7 @@ public abstract class AbstractActor {
         }
     }
 
-    public class InPort<T> extends Port implements Subscriber<T> {
-        protected Subscription subscription;
+    public class InPort<T> extends Port implements OutMessagePort<T> {
         private T item;
         protected boolean completeSignalled;
         protected Throwable completionException = null;
@@ -170,42 +171,16 @@ public abstract class AbstractActor {
             return item;
         }
 
-        @Override
-        public void onSubscribe(Subscription subscription) {
-            if (this.subscription != null) {
-                subscription.cancel();
-                return;
-            }
-            this.subscription = subscription;
+        public boolean isCompleted() {
+            return item==null && completeSignalled;
         }
 
-        public T poll() {
-            synchronized (AbstractActor.this) {
-                T res = item;
-                item = null;
-                if (!completeSignalled) {
-                    block();
-                }
-                return res;
-            }
+        public boolean isCompletedExceptionally() {
+            return item==null && completeSignalled && completionException != null;
         }
 
-        public T remove() {
-            synchronized (AbstractActor.this) {
-                T res = item;
-                item = null;
-                if (res == null) {
-                    if (completeSignalled) {
-                        throw new NoSuchElementException(); // better should be CompletionException(
-                    } else {
-                        throw new RuntimeException("Internal error");
-                    }
-                }
-                if (!completeSignalled) {
-                    block();
-                }
-                return res;
-            }
+        public Throwable getCompletionException() {
+            return completionException;
         }
 
         @Override
@@ -213,16 +188,14 @@ public abstract class AbstractActor {
             if (item == null) {
                 throw new NullPointerException();
             }
-            synchronized (AbstractActor.this) {
-                if (completeSignalled) {
-                    return;
-                }
-                if (this.item != null) {
-                    throw new IllegalStateException();
-                }
-                this.item = item;
-                unBlock();
+            if (completeSignalled) {
+                return;
             }
+            if (this.item != null) {
+                throw new IllegalStateException();
+            }
+            this.item = item;
+            unBlock();
         }
 
         @Override
@@ -251,51 +224,30 @@ public abstract class AbstractActor {
             }
         }
 
-        public boolean isCompleted() {
-            return item==null && completeSignalled;
-        }
-
-        public boolean isCompletedExceptionally() {
-            return item==null && completeSignalled && completionException != null;
-        }
-
-        public Throwable getCompletionException() {
-            return completionException;
-        }
-    }
-
-    public class OutPort<T> implements Publisher<T>, Subscription {
-        protected InPort<Subscriber<? super T>> subscriberPort = new InPort<>();
-
-        @Override
-        public void subscribe(Subscriber<? super T> subscriber) {
-            if (subscriber == null) {
-                subscriber.onError(new NullPointerException());
-                return;
+        public synchronized T poll() {
+            T res = item;
+            item = null;
+            if (!completeSignalled) {
+                block();
             }
-            this.subscriberPort.onNext(subscriber);
-            subscriber.onSubscribe(this);
+            return res;
         }
 
-        public void request(long n) {
-            // do nothing
-        }
-
-        @Override
-        public void cancel() {
-            subscriberPort.poll();
-        }
-
-        public void onNext(T item) {
-            subscriberPort.current().onNext(item);
-        }
-
-        public void onComplete() {
-            subscriberPort.current().onComplete();
-        }
-
-        public void onError(Throwable throwable) {
-            subscriberPort.current().onError(throwable);
+        public synchronized T remove() {
+            T res = item;
+            item = null;
+            if (res == null) {
+                if (completeSignalled) {
+                    throw new NoSuchElementException(); // better should be CompletionException(
+                } else {
+                    throw new RuntimeException("Internal error");
+                }
+            }
+            if (!completeSignalled) {
+                block();
+            }
+            return res;
         }
     }
+
 }

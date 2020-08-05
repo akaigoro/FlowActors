@@ -1,15 +1,13 @@
-package org.df4j.pipeline;
-
-import org.df4j.plainactors.AbstractSubscriber;
+package org.df4j.plainactors;
 
 import java.util.logging.Logger;
 
-public class SubscriberActor extends AbstractSubscriber<Long> {
+public class ConsumerActor extends AbstractConsumer<Long> {
     AsyncSemaPort sema;
     Logger logger = Logger.getLogger("consumer");
     final int delay;
 
-    public SubscriberActor(int delay) {
+    public ConsumerActor(int delay) {
         this.delay = delay;
     }
 
@@ -24,12 +22,13 @@ public class SubscriberActor extends AbstractSubscriber<Long> {
 
     @Override
     public void whenComplete() {
-        super.complete();
+        super.whenComplete();
         logger.info("  got: completed.");
     }
 
     @Override
     public void whenError(Throwable throwable) {
+        super.whenError(throwable);
         logger.info(" completed with error:"+throwable);
     }
 }
