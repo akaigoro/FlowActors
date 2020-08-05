@@ -65,7 +65,7 @@ public abstract class AbstractActor {
 
     protected abstract void turn() throws Throwable;
 
-    protected void run() {
+    private void run() {
         try {
             turn();
             restart();
@@ -96,25 +96,25 @@ public abstract class AbstractActor {
     }
 
     class Port {
-        boolean ready = false;
+        private boolean isBlocked = true;
 
         public Port() {
             incBlockCount();
         }
 
         protected synchronized void block() {
-            if (!ready) {
+            if (isBlocked) {
                 return;
             }
-            ready = false;
+            isBlocked = true;
             incBlockCount();
         }
 
         protected synchronized void unBlock() {
-            if (ready) {
+            if (!isBlocked) {
                 return;
             }
-            ready = true;
+            isBlocked = false;
             decBlockCount();
         }
     }
@@ -171,33 +171,16 @@ public abstract class AbstractActor {
             return item;
         }
 
-        public T poll() {
-            synchronized (AbstractActor.this) {
-                T res = item;
-                item = null;
-                if (!completeSignalled) {
-                    block();
-                }
-                return res;
-            }
+        public boolean isCompleted() {
+            return item==null && completeSignalled;
         }
 
-        public T remove() {
-            synchronized (AbstractActor.this) {
-                T res = item;
-                item = null;
-                if (res == null) {
-                    if (completeSignalled) {
-                        throw new NoSuchElementException(); // better should be CompletionException(
-                    } else {
-                        throw new RuntimeException("Internal error");
-                    }
-                }
-                if (!completeSignalled) {
-                    block();
-                }
-                return res;
-            }
+        public boolean isCompletedExceptionally() {
+            return item==null && completeSignalled && completionException != null;
+        }
+
+        public Throwable getCompletionException() {
+            return completionException;
         }
 
         @Override
@@ -205,16 +188,14 @@ public abstract class AbstractActor {
             if (item == null) {
                 throw new NullPointerException();
             }
-            synchronized (AbstractActor.this) {
-                if (completeSignalled) {
-                    return;
-                }
-                if (this.item != null) {
-                    throw new IllegalStateException();
-                }
-                this.item = item;
-                unBlock();
+            if (completeSignalled) {
+                return;
             }
+            if (this.item != null) {
+                throw new IllegalStateException();
+            }
+            this.item = item;
+            unBlock();
         }
 
         @Override
@@ -243,16 +224,29 @@ public abstract class AbstractActor {
             }
         }
 
-        public boolean isCompleted() {
-            return item==null && completeSignalled;
+        public synchronized T poll() {
+            T res = item;
+            item = null;
+            if (!completeSignalled) {
+                block();
+            }
+            return res;
         }
 
-        public boolean isCompletedExceptionally() {
-            return item==null && completeSignalled && completionException != null;
-        }
-
-        public Throwable getCompletionException() {
-            return completionException;
+        public synchronized T remove() {
+            T res = item;
+            item = null;
+            if (res == null) {
+                if (completeSignalled) {
+                    throw new NoSuchElementException(); // better should be CompletionException(
+                } else {
+                    throw new RuntimeException("Internal error");
+                }
+            }
+            if (!completeSignalled) {
+                block();
+            }
+            return res;
         }
     }
 
