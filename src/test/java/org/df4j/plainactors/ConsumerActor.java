@@ -22,12 +22,13 @@ public class ConsumerActor extends AbstractConsumer<Long> {
 
     @Override
     public void whenComplete() {
-        super.complete();
+        super.whenComplete();
         logger.info("  got: completed.");
     }
 
     @Override
     public void whenError(Throwable throwable) {
+        super.whenError(throwable);
         logger.info(" completed with error:"+throwable);
     }
 }

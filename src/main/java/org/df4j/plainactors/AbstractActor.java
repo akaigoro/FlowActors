@@ -52,12 +52,12 @@ public abstract class AbstractActor {
         return state == State.COMPLETED;
     }
 
-    protected synchronized void complete() {
+    protected synchronized void whenComplete() {
         state = State.COMPLETED;
         notifyAll();
     }
 
-    protected synchronized void completExceptionally(Throwable throwable) {
+    protected synchronized void whenError(Throwable throwable) {
         completionException = throwable;
         state = State.COMPLETED;
         notifyAll();
@@ -70,7 +70,7 @@ public abstract class AbstractActor {
             turn();
             restart();
         } catch (Throwable throwable) {
-            completExceptionally(throwable);
+            whenError(throwable);
         }
     }
 

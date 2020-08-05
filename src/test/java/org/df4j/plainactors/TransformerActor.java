@@ -20,13 +20,13 @@ public class TransformerActor extends AbstractTransformer<Long,Long> {
 
     @Override
     public void whenComplete() {
-        super.complete();
+        super.whenComplete();
         logger.info("  got: completed.");
     }
 
     @Override
-    public void completExceptionally(Throwable throwable) {
-        super.completExceptionally(throwable);
+    public void whenError(Throwable throwable) {
+        super.whenError(throwable);
         logger.info(" completed with error:"+throwable);
     }
 }

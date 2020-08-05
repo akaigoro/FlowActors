@@ -21,13 +21,13 @@ public abstract class AbstractTransformer<T, R> extends AbstractActor {
         return outPort;
     }
 
-    protected synchronized void complete() {
-        super.complete();
+    protected synchronized void whenComplete() {
+        super.whenComplete();
         outPort.onComplete();
     }
 
-    protected synchronized void completExceptionally(Throwable throwable) {
-        super.completExceptionally(throwable);
+    protected synchronized void whenError(Throwable throwable) {
+        super.whenError(throwable);
         outPort.onError(throwable);
     }
 
@@ -39,20 +39,14 @@ public abstract class AbstractTransformer<T, R> extends AbstractActor {
      */
     protected abstract R whenNext(T item)  throws Throwable;
 
-    protected void whenComplete() {}
-
-    protected void whenError(Throwable throwable) {}
-
     /** processes one data item
      */
     @Override
     protected void turn() throws Throwable {
         if (inPort.isCompletedExceptionally()) {
             Throwable completionException = inPort.getCompletionException();
-            completExceptionally(completionException);
             whenError(completionException);
         } else  if (inPort.isCompleted()) {
-            complete();
             whenComplete();
         } else {
             T item = inPort.poll();
@@ -61,7 +55,7 @@ public abstract class AbstractTransformer<T, R> extends AbstractActor {
             }
             R res = whenNext(item);
             if (res == null) {
-                complete();
+                whenComplete();
             } else {
                 outPort.onNext(res);
             }

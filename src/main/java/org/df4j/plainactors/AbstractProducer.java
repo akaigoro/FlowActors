@@ -8,13 +8,13 @@ package org.df4j.plainactors;
 public abstract class AbstractProducer<R> extends AbstractActor {
     public OutMessagePort<R> outPort;
 
-    protected synchronized void complete() {
-        super.complete();
+    protected synchronized void whenComplete() {
+        super.whenComplete();
         outPort.onComplete();
     }
 
-    protected synchronized void completExceptionally(Throwable throwable) {
-        super.completExceptionally(throwable);
+    protected synchronized void whenError(Throwable throwable) {
+        super.whenError(throwable);
         outPort.onError(throwable);
     }
 
@@ -26,7 +26,7 @@ public abstract class AbstractProducer<R> extends AbstractActor {
     protected void turn() throws Throwable {
         R res = whenNext();
         if (res == null) {
-            complete();
+            whenComplete();
         } else {
             outPort.onNext(res);
         }
