@@ -8,9 +8,8 @@ public abstract class AbstractSubscriber<T> extends org.df4j.plainactors.Abstrac
         inPort = new ReactiveInPort<>(this);
     }
 
-    @Override
     public ReactiveInPort<T> getInPort() {
-        return (ReactiveInPort<T>) super.getInPort();
+        return (ReactiveInPort<T>) inPort;
     }
 
     @Override

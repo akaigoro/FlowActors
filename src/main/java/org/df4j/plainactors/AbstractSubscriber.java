@@ -7,10 +7,6 @@ public abstract class AbstractSubscriber<T> extends AbstractActor {
         inPort = new InPort<>();
     }
 
-    public InPort<T> getInPort() {
-        return inPort;
-    }
-
     protected abstract void whenNext(T item) throws Throwable;
 
     protected void whenComplete() {}

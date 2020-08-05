@@ -16,9 +16,8 @@ public abstract class AbstractPublisher<T> extends org.df4j.plainactors.Abstract
         outPort = new ReactiveOutPort<>(this);
     }
 
-    @Override
     public ReactiveOutPort<T> getOutPort() {
-        return (ReactiveOutPort<T>) super.getOutPort();
+        return (ReactiveOutPort<T>) outPort;
     }
 
     @Override

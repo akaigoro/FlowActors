@@ -13,10 +13,6 @@ public abstract class AbstractPublisher<R> extends AbstractActor {
         outPort.onComplete();
     }
 
-    public OutMessagePort<R> getOutPort() {
-        return outPort;
-    }
-
     protected synchronized void completExceptionally(Throwable throwable) {
         super.completExceptionally(throwable);
         outPort.onError(throwable);
