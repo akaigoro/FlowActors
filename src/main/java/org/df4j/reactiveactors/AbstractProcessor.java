@@ -1,15 +1,15 @@
 package org.df4j.reactiveactors;
 
-import org.df4j.plainactors.OutMessagePort;
-
-import java.util.concurrent.Flow;
+import org.reactivestreams.Processor;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 
 /**
  * To make concrete processor, the method {@link AbstractProcessor##atNext(Object)} need to be implemented
  * @param <T> type of processed data
  * @param <R> type of produced data
  */
-public abstract class AbstractProcessor<T, R> extends org.df4j.plainactors.AbstractProcessor<T,R> implements Flow.Processor<T,R> {
+public abstract class AbstractProcessor<T, R> extends org.df4j.plainactors.AbstractProcessor<T,R> implements Processor<T,R> {
 
     protected void init() {
         inPort = new ReactiveInPort<>(this);
@@ -27,12 +27,12 @@ public abstract class AbstractProcessor<T, R> extends org.df4j.plainactors.Abstr
     }
 
     @Override
-    public void subscribe(Flow.Subscriber<? super R> subscriber) {
+    public void subscribe(Subscriber<? super R> subscriber) {
         getOutPort().subscribe(subscriber);
     }
 
     @Override
-    public void onSubscribe(Flow.Subscription subscription) {
+    public void onSubscribe(Subscription subscription) {
         getInPort().onSubscribe(subscription);
     }
 

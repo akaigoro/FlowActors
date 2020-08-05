@@ -1,17 +1,17 @@
 package org.df4j.reactiveactors;
 
 import org.df4j.plainactors.AbstractActor;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 
-import java.util.concurrent.Flow;
-
-public class ReactiveInPort<T> extends AbstractActor.InPort<T> implements Flow.Subscriber<T> {
-    protected Flow.Subscription subscription;
+public class ReactiveInPort<T> extends AbstractActor.InPort<T> implements Subscriber<T> {
+    protected Subscription subscription;
 
     public ReactiveInPort(AbstractActor actor) {
         actor.super();
     }
     @Override
-    public void onSubscribe(Flow.Subscription subscription) {
+    public void onSubscribe(Subscription subscription) {
         if (this.subscription != null) {
             subscription.cancel();
             return;

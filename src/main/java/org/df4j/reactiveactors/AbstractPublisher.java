@@ -1,16 +1,14 @@
 package org.df4j.reactiveactors;
 
-import org.df4j.plainactors.OutMessagePort;
-
-import java.util.concurrent.Flow;
-import java.util.concurrent.Flow.Publisher;
+import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscriber;
 
 /**
  * minimalistic {@link Publisher} implementation.
  * Only one subscriber can subscribe.
  * @param <T> type of produced data
  */
-public abstract class AbstractPublisher<T> extends org.df4j.plainactors.AbstractPublisher<T> implements Flow.Publisher<T> {
+public abstract class AbstractPublisher<T> extends org.df4j.plainactors.AbstractPublisher<T> implements Publisher<T> {
 
     protected void init() {
         outPort = new ReactiveOutPort<>(this);
@@ -21,7 +19,7 @@ public abstract class AbstractPublisher<T> extends org.df4j.plainactors.Abstract
     }
 
     @Override
-    public void subscribe(Flow.Subscriber<? super T> subscriber) {
+    public void subscribe(Subscriber<? super T> subscriber) {
         getOutPort().subscribe(subscriber);
     }
 }
