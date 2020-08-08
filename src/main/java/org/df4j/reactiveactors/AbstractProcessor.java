@@ -14,7 +14,7 @@ public abstract class AbstractProcessor<T, R> extends AbstractTransformer<T,R> i
 
     protected void init() {
         inPort = new ReactiveInPort<>(this);
-        outPort = new ReactiveOutPort<R>(this);
+        outPort = new ReactiveOutPort<>(this);
     }
 
     @Override

@@ -3,7 +3,7 @@ package org.df4j.plainactors;
 /**
  * minimalistic implementation.
  * Only one subscriber can subscribe.
- * @param <T> type of produced data
+ * @param <R> type of produced data
  */
 public abstract class AbstractProducer<R> extends AbstractActor {
     public OutMessagePort<R> outPort;

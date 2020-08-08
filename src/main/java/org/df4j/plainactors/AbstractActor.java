@@ -102,6 +102,18 @@ public abstract class AbstractActor {
             incBlockCount();
         }
 
+        public boolean isBlocked() {
+            return isBlocked;
+        }
+
+        public boolean isEmpty() {
+            return isBlocked;
+        }
+
+        public boolean isFull() {
+            return isBlocked;
+        }
+
         protected synchronized void block() {
             if (isBlocked) {
                 return;
@@ -123,22 +135,32 @@ public abstract class AbstractActor {
         private long permissions = 0;
 
         public AsyncSemaPort(long permissions) {
-            release(permissions);
+            setPermissions(permissions);
         }
 
         public AsyncSemaPort() {
         }
 
-        public synchronized void release(long n) {
-            if (n <= 0) {
+        public synchronized void setPermissions(long newPermissionsValue) {
+            permissions = newPermissionsValue;
+            if (permissions > 0) {
+                unBlock();
+            } else {
+                block();
+            }
+        }
+
+        public synchronized void release(long delta) {
+            if (delta <= 0) {
                 throw new IllegalArgumentException();
             }
-            boolean doUnBlock = permissions == 0;
-            permissions += n;
-            if (permissions < 0) { // overflow
+            long newPermissionsValue = permissions + delta;
+            if (newPermissionsValue < permissions) {
                 permissions = Long.MAX_VALUE;
+            } else {
+                permissions = newPermissionsValue;
             }
-            if (doUnBlock) {
+            if (permissions > 0) {
                 unBlock();
             }
         }
@@ -148,11 +170,12 @@ public abstract class AbstractActor {
                 throw new IllegalArgumentException();
             }
             long newPermissionsValue = permissions-delta;
-            if (newPermissionsValue < 0) {
-                throw new IllegalArgumentException();
+            if (newPermissionsValue > permissions) {
+                permissions = Long.MIN_VALUE;
+            } else {
+                permissions = newPermissionsValue;
             }
-            permissions = newPermissionsValue;
-            if (permissions == 0) {
+            if (permissions <= 0) {
                 block();
             }
         }
