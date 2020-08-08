@@ -1,4 +1,4 @@
-package org.df4j.reactiveactors;
+package org.df4j.concurrent.flow;
 
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.tck.TestEnvironment;

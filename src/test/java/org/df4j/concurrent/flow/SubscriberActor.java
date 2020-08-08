@@ -1,21 +1,21 @@
-package org.df4j.reactiveactors;
+package org.df4j.concurrent.flow;
 
 import java.util.logging.Logger;
 
-public class ProcessorActor extends AbstractProcessor<Long,Long> {
-    Logger logger = Logger.getLogger("processor");
+public class SubscriberActor extends AbstractSubscriber<Long> {
+    public InPort<Long> inPort;
+    Logger logger = Logger.getLogger("consumer");
     final int delay;
 
-    public ProcessorActor(int delay) {
+    public SubscriberActor(int delay) {
         this.delay = delay;
     }
 
-    @Override
-    protected Long whenNext(Long item) {
+    protected void whenNext(Long item) throws InterruptedException {
+        Thread.sleep(delay);
         if (Math.abs(item) < 100 || item%10 == 0) {
             logger.info("  got:"+item);
         }
-        return item;
     }
 
     @Override
