@@ -11,7 +11,7 @@ import org.reactivestreams.Subscription;
  */
 public abstract class AbstractProcessor<T, R> extends AbstractActor implements Processor<T,R> {
 
-    public InPort<T> inPort = new ReactiveInPort<>();
+    public ReactiveInPort<T> inPort = new ReactiveInPort<>();
 
     public ReactiveOutPort<R> outPort = new ReactiveOutPort<>();
 
@@ -20,11 +20,11 @@ public abstract class AbstractProcessor<T, R> extends AbstractActor implements P
     }
 
     public ReactiveInPort<T> getInPort() {
-        return (ReactiveInPort<T>) inPort;
+        return inPort;
     }
 
     public ReactiveOutPort<R> getOutPort() {
-        return (ReactiveOutPort<R>) outPort;
+        return outPort;
     }
 
     @Override

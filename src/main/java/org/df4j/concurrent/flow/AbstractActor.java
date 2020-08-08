@@ -4,6 +4,7 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
+import java.util.ArrayDeque;
 import java.util.NoSuchElementException;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
@@ -190,20 +191,40 @@ public abstract class AbstractActor {
     }
 
     public class InPort<T> extends Port {
-        private T item;
+        private final int capacity;
+        private final ArrayDeque<T> items;
         protected boolean completeSignalled;
         protected Throwable completionException = null;
 
+        public InPort(int capacity) {
+            this.capacity = capacity;
+            items = new ArrayDeque<>(capacity);
+        }
+
+        public InPort() {
+            this(8);
+        }
+
+        @Override
+        public boolean isEmpty() {
+            return items.isEmpty();
+        }
+
+        @Override
+        public boolean isFull() {
+            return items.size() == capacity;
+        }
+
         public T current() {
-            return item;
+            return items.peek();
         }
 
         public boolean isCompleted() {
-            return item==null && completeSignalled;
+            return isEmpty() && completeSignalled;
         }
 
         public boolean isCompletedExceptionally() {
-            return item==null && completeSignalled && completionException != null;
+            return isEmpty() && completeSignalled && completionException != null;
         }
 
         public Throwable getCompletionException() {
@@ -217,65 +238,68 @@ public abstract class AbstractActor {
             if (completeSignalled) {
                 return;
             }
-            if (this.item != null) {
+            if (isFull()) {
                 throw new IllegalStateException();
             }
-            this.item = item;
+            this.items.add(item);
             unBlock();
         }
 
         public void onError(Throwable throwable) {
-            synchronized (AbstractActor.this) {
-                if (completeSignalled) {
-                    return;
-                }
-                if (throwable == null) {
-                    throw new NullPointerException();
-                }
-                completeSignalled = true;
-                completionException = throwable;
-                unBlock();
+            if (completeSignalled) {
+                return;
             }
+            if (throwable == null) {
+                throw new NullPointerException();
+            }
+            completeSignalled = true;
+            completionException = throwable;
+            unBlock();
         }
 
-        public void onComplete() {
-            synchronized (AbstractActor.this) {
-                if (completeSignalled) {
-                    return;
-                }
-                completeSignalled = true;
-                unBlock();
+        public synchronized void onComplete() {
+            if (completeSignalled) {
+                return;
             }
+            completeSignalled = true;
+            unBlock();
         }
 
         public synchronized T poll() {
-            T res = item;
-            item = null;
-            if (!completeSignalled) {
+            T res = items.poll();
+            if (isEmpty() && !completeSignalled) {
                 block();
             }
             return res;
         }
 
         public synchronized T remove() {
-            T res = item;
-            item = null;
-            if (res == null) {
-                if (completeSignalled) {
-                    throw new NoSuchElementException(); // better should be CompletionException(
-                } else {
-                    throw new RuntimeException("Internal error");
-                }
+            T res = poll();
+            if (res != null) {
+                return res;
+            } else  if (completeSignalled) {
+                throw new NoSuchElementException(); // better should be CompletionException(
+            } else {
+                throw new RuntimeException("Internal error");
             }
-            if (!completeSignalled) {
-                block();
-            }
-            return res;
         }
     }
 
-    public class ReactiveInPort<T> extends InPort<T> implements Subscriber<T> {
+    public class ReactiveInPort<T> extends Port implements Subscriber<T> {
+        private final int capacity;
+        private final ArrayDeque<T> items;
         protected Subscription subscription;
+        protected boolean completeSignalled;
+        protected Throwable completionException = null;
+
+        public ReactiveInPort(int capacity) {
+            this.capacity = capacity;
+            items = new ArrayDeque<>(capacity);
+        }
+
+        public ReactiveInPort() {
+            this(8);
+        }
 
         @Override
         public synchronized void onSubscribe(Subscription subscription) {
@@ -284,25 +308,98 @@ public abstract class AbstractActor {
                 return;
             }
             this.subscription = subscription;
-            request(1);
+            int freeSpace = capacity - items.size();
+            if (freeSpace > 0) {
+                subscription.request(freeSpace);
+            }
         }
 
-        public void request(long n) {
-            subscription.request(n);
-        }
-
-        @Override
         public T poll() {
-            T res = super.poll();
-            request(1);
-            return res;
+            T result;
+            boolean extracted;
+            synchronized (this) {
+                int size0 = items.size();
+                result = items.poll();
+                extracted = size0 > items.size();
+                if (isEmpty() && !completeSignalled) {
+                    block();
+                }
+            }
+            if (extracted) {
+                subscription.request(1);
+            }
+            return result;
+        }
+
+        public synchronized T remove() {
+            T result = poll();
+            if (result != null) {
+                return result;
+            } else  if (completeSignalled) {
+                throw new NoSuchElementException(); // better should be CompletionException(
+            } else {
+                throw new RuntimeException("Internal error");
+            }
         }
 
         @Override
-        public T remove() {
-            T res = super.remove();
-            request(1);
-            return res;
+        public boolean isEmpty() {
+            return items.isEmpty();
+        }
+
+        @Override
+        public boolean isFull() {
+            return items.size() == capacity;
+        }
+
+        public T current() {
+            return items.poll();
+        }
+
+        public boolean isCompleted() {
+            return isEmpty() && completeSignalled;
+        }
+
+        public boolean isCompletedExceptionally() {
+            return isEmpty() && completeSignalled && completionException != null;
+        }
+
+        public Throwable getCompletionException() {
+            return completionException;
+        }
+
+        public void onNext(T item) {
+            if (item == null) {
+                throw new NullPointerException();
+            }
+            if (completeSignalled) {
+                return;
+            }
+            if (isFull()) {
+                throw new IllegalStateException();
+            }
+            this.items.add(item);
+            unBlock();
+        }
+
+        public void onError(Throwable throwable) {
+            if (completeSignalled) {
+                return;
+            }
+            if (throwable == null) {
+                throw new NullPointerException();
+            }
+            completeSignalled = true;
+            completionException = throwable;
+            unBlock();
+        }
+
+        public synchronized void onComplete() {
+            if (completeSignalled) {
+                return;
+            }
+            completeSignalled = true;
+            unBlock();
         }
     }
 

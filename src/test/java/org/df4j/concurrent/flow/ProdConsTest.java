@@ -11,7 +11,7 @@ public class ProdConsTest {
         prod.subscribe(cons);
         prod.start();
         cons.start();
-        cons.join(Math.max(delay1, delay2)*cnt+400);
+        cons.join(Math.max(delay1, delay2)*cnt+400000);
         boolean completed = cons.isCompleted();
         Assert.assertTrue(completed);
     }

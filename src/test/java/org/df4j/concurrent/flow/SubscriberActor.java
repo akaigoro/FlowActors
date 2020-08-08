@@ -3,7 +3,6 @@ package org.df4j.concurrent.flow;
 import java.util.logging.Logger;
 
 public class SubscriberActor extends AbstractSubscriber<Long> {
-    public InPort<Long> inPort;
     Logger logger = Logger.getLogger("consumer");
     final int delay;
 
