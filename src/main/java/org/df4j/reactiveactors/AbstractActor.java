@@ -1,4 +1,8 @@
-package org.df4j.plainactors;
+package org.df4j.reactiveactors;
+
+import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 
 import java.util.NoSuchElementException;
 import java.util.concurrent.CompletionException;
@@ -111,7 +115,7 @@ public abstract class AbstractActor {
         }
 
         public boolean isFull() {
-            return isBlocked;
+            return !isBlocked;
         }
 
         protected synchronized void block() {
@@ -185,7 +189,7 @@ public abstract class AbstractActor {
         }
     }
 
-    public class InPort<T> extends Port implements OutMessagePort<T> {
+    public class InPort<T> extends Port {
         private T item;
         protected boolean completeSignalled;
         protected Throwable completionException = null;
@@ -206,7 +210,6 @@ public abstract class AbstractActor {
             return completionException;
         }
 
-        @Override
         public void onNext(T item) {
             if (item == null) {
                 throw new NullPointerException();
@@ -221,7 +224,6 @@ public abstract class AbstractActor {
             unBlock();
         }
 
-        @Override
         public void onError(Throwable throwable) {
             synchronized (AbstractActor.this) {
                 if (completeSignalled) {
@@ -236,7 +238,6 @@ public abstract class AbstractActor {
             }
         }
 
-        @Override
         public void onComplete() {
             synchronized (AbstractActor.this) {
                 if (completeSignalled) {
@@ -273,4 +274,100 @@ public abstract class AbstractActor {
         }
     }
 
+    public class ReactiveInPort<T> extends InPort<T> implements Subscriber<T> {
+        protected Subscription subscription;
+
+        @Override
+        public synchronized void onSubscribe(Subscription subscription) {
+            if (this.subscription != null) {
+                subscription.cancel();
+                return;
+            }
+            this.subscription = subscription;
+            request(1);
+        }
+
+        public void request(long n) {
+            subscription.request(n);
+        }
+
+        @Override
+        public T poll() {
+            T res = super.poll();
+            request(1);
+            return res;
+        }
+
+        @Override
+        public T remove() {
+            T res = super.remove();
+            request(1);
+            return res;
+        }
+    }
+
+    public class ReactiveOutPort<T> implements Publisher<T>, Subscription {
+        protected InPort<Subscriber<? super T>> subscriber = new InPort<>();
+        protected AsyncSemaPort sema = new AsyncSemaPort();
+
+        @Override
+        public synchronized void subscribe(Subscriber<? super T> subscriber) {
+            if (subscriber == null) {
+                throw new NullPointerException();
+            }
+            if (this.subscriber.isFull()) {
+                subscriber.onError(new IllegalStateException());
+                return;
+            }
+            this.subscriber.onNext(subscriber);
+            subscriber.onSubscribe(this);
+        }
+
+        @Override
+        public synchronized void request(long n) {
+            if (subscriber.isEmpty()) {
+                return; // this spec requirement
+            }
+            if (n <= 0) {
+                subscriber.current().onError(new IllegalArgumentException());
+                return;
+            }
+            sema.release(n);
+        }
+
+        public synchronized void onNext(T item) {
+            Subscriber<? super T> subscriber = this.subscriber.current();
+            if (subscriber == null) {
+                throw  new IllegalStateException();
+            }
+            sema.aquire();
+            subscriber.onNext(item);
+        }
+
+        @Override
+        public synchronized void cancel() {
+            Subscriber<? super T> subscriber = this.subscriber.current();
+            if (subscriber == null) {
+                return;
+            }
+            this.subscriber.remove();
+            this.sema.setPermissions(0);
+        }
+
+        public synchronized void onComplete() {
+            Subscriber<? super T> subscriber = this.subscriber.poll();
+            if (subscriber == null) {
+                return;
+            }
+            subscriber.onComplete();
+        }
+
+        public synchronized void onError(Throwable throwable) {
+            Subscriber<? super T> subscriber = this.subscriber.poll();
+            if (subscriber == null) {
+                return;
+            }
+            subscriber.onError(throwable);
+        }
+    }
 }

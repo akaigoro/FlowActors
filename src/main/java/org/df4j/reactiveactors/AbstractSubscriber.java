@@ -1,16 +1,20 @@
 package org.df4j.reactiveactors;
 
-import org.df4j.plainactors.AbstractConsumer;
-import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 
-public abstract class AbstractSubscriber<T> extends AbstractConsumer<T> implements Subscriber<T> {
+import java.util.logging.Logger;
 
-    protected void init() {
-        inPort = new ReactiveInPort<>(this);
+public class AbstractSubscriber<T> extends AbstractActor implements org.reactivestreams.Subscriber<T> {
+    public ReactiveInPort<T> inPort = new ReactiveInPort<>();
+    Logger logger = Logger.getLogger("consumer");
+
+    @Override
+    public void onSubscribe(Subscription subscription) {
+        getInPort().onSubscribe(subscription);
     }
 
     public ReactiveInPort<T> getInPort() {
-        return (ReactiveInPort<T>) inPort;
+        return inPort;
     }
 
     @Override
@@ -26,5 +30,25 @@ public abstract class AbstractSubscriber<T> extends AbstractConsumer<T> implemen
     @Override
     public void onComplete() {
         inPort.onComplete();
+    }
+
+    protected void whenNext(T item) throws Throwable {}
+
+    /** processes one data item
+     */
+    @Override
+    protected void turn() throws Throwable {
+        if (inPort.isCompletedExceptionally()) {
+            Throwable completionException = inPort.getCompletionException();
+            whenError(completionException);
+        } else  if (inPort.isCompleted()) {
+            whenComplete();
+        } else {
+            T item = inPort.poll();
+            if (item==null) {
+                throw new RuntimeException();
+            }
+            whenNext(item);
+        }
     }
 }

@@ -1,6 +1,5 @@
 package org.df4j.reactiveactors;
 
-import org.df4j.plainactors.AbstractProducer;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 
@@ -9,18 +8,44 @@ import org.reactivestreams.Subscriber;
  * Only one subscriber can subscribe.
  * @param <T> type of produced data
  */
-public abstract class AbstractPublisher<T> extends AbstractProducer<T> implements Publisher<T> {
+public abstract class AbstractPublisher<T> extends AbstractActor implements Publisher<T> {
+
+    public ReactiveOutPort<T> outPort;
 
     protected void init() {
-        outPort = new ReactiveOutPort<>(this);
+        outPort = new ReactiveOutPort<>();
     }
 
     public ReactiveOutPort<T> getOutPort() {
-        return (ReactiveOutPort<T>) outPort;
+        return outPort;
     }
 
     @Override
     public void subscribe(Subscriber<? super T> subscriber) {
         getOutPort().subscribe(subscriber);
+    }
+
+    protected synchronized void whenComplete() {
+        super.whenComplete();
+        outPort.onComplete();
+    }
+
+    protected synchronized void whenError(Throwable throwable) {
+        super.whenError(throwable);
+        outPort.onError(throwable);
+    }
+
+    protected abstract T whenNext()  throws Throwable;
+
+    /** generates one data item
+     */
+    @Override
+    protected void turn() throws Throwable {
+        T res = whenNext();
+        if (res == null) {
+            whenComplete();
+        } else {
+            outPort.onNext(res);
+        }
     }
 }

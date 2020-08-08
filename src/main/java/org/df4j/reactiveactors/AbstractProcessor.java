@@ -1,6 +1,5 @@
 package org.df4j.reactiveactors;
 
-import org.df4j.plainactors.AbstractTransformer;
 import org.reactivestreams.Processor;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -10,21 +9,22 @@ import org.reactivestreams.Subscription;
  * @param <T> type of processed data
  * @param <R> type of produced data
  */
-public abstract class AbstractProcessor<T, R> extends AbstractTransformer<T,R> implements Processor<T,R> {
+public abstract class AbstractProcessor<T, R> extends AbstractActor implements Processor<T,R> {
+
+    public InPort<T> inPort = new ReactiveInPort<>();
+
+    public ReactiveOutPort<R> outPort = new ReactiveOutPort<>();
+
 
     protected void init() {
-        inPort = new ReactiveInPort<>(this);
-        outPort = new ReactiveOutPort<>(this);
     }
 
-    @Override
     public ReactiveInPort<T> getInPort() {
-        return (ReactiveInPort<T>) super.getInPort();
+        return (ReactiveInPort<T>) inPort;
     }
 
-    @Override
     public ReactiveOutPort<R> getOutPort() {
-        return (ReactiveOutPort<R>) super.getOutPort();
+        return (ReactiveOutPort<R>) outPort;
     }
 
     @Override
@@ -52,5 +52,45 @@ public abstract class AbstractProcessor<T, R> extends AbstractTransformer<T,R> i
         inPort.onComplete();
     }
 
+    protected synchronized void whenComplete() {
+        super.whenComplete();
+        outPort.onComplete();
+    }
+
+    protected synchronized void whenError(Throwable throwable) {
+        super.whenError(throwable);
+        outPort.onError(throwable);
+    }
+
+    /**
+     *
+     * @param item input data
+     * @return processed data
+     * @throws Throwable if something went wrong
+     */
+    protected abstract R whenNext(T item)  throws Throwable;
+
+    /** processes one data item
+     */
+    @Override
+    protected void turn() throws Throwable {
+        if (inPort.isCompletedExceptionally()) {
+            Throwable completionException = inPort.getCompletionException();
+            whenError(completionException);
+        } else  if (inPort.isCompleted()) {
+            whenComplete();
+        } else {
+            T item = inPort.poll();
+            if (item==null) {
+                throw new RuntimeException();
+            }
+            R res = whenNext(item);
+            if (res == null) {
+                whenComplete();
+            } else {
+                outPort.onNext(res);
+            }
+        }
+    }
 }
 

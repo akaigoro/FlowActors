@@ -5,6 +5,7 @@ import org.reactivestreams.Subscription;
 import java.util.logging.Logger;
 
 public class SubscriberActor extends AbstractSubscriber<Long> {
+    public InPort<Long> inPort;
     Logger logger = Logger.getLogger("consumer");
     final int delay;
 
@@ -12,7 +13,6 @@ public class SubscriberActor extends AbstractSubscriber<Long> {
         this.delay = delay;
     }
 
-    @Override
     protected void whenNext(Long item) throws InterruptedException {
         Thread.sleep(delay);
         if (Math.abs(item) < 100 || item%10 == 0) {
@@ -30,10 +30,5 @@ public class SubscriberActor extends AbstractSubscriber<Long> {
     public void whenError(Throwable throwable) {
         super.whenError(throwable);
         logger.info(" completed with error:"+throwable);
-    }
-
-    @Override
-    public void onSubscribe(Subscription subscription) {
-        getInPort().onSubscribe(subscription);
     }
 }
