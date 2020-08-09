@@ -13,7 +13,7 @@ import java.util.concurrent.Flow;
  */
 public class InpFlow<T> extends CompletablePort implements Flow.Subscriber<T> {
     private int bufferCapacity;
-    private ArrayDeque<T> tokens;
+    private final ArrayDeque<T> tokens;
     protected Flow.Subscription subscription;
     private long requestedCount;
 
@@ -24,22 +24,8 @@ public class InpFlow<T> extends CompletablePort implements Flow.Subscriber<T> {
      */
     public InpFlow(Actor parent, int capacity) {
         super(parent);
-        setCapacity(capacity);
-    }
-
-    /**
-     * @param parent {@link AsyncProc} to which this port belongs
-     */
-    public InpFlow(Actor parent) {
-        this(parent, 1);
-    }
-
-    public void setCapacity(int capacity) {
         if (capacity <= 0) {
             throw new IllegalArgumentException();
-        }
-        if (capacity == this.bufferCapacity) {
-            return;
         }
         bufferCapacity = capacity;
         tokens = new ArrayDeque<>(capacity);
@@ -66,15 +52,13 @@ public class InpFlow<T> extends CompletablePort implements Flow.Subscriber<T> {
         }
     }
 
-    public T current() {
-        synchronized(parent) {
-            return tokens.peek();
-        }
+    public synchronized T current() {
+        return tokens.peek();
     }
 
     @Override
-    public void onSubscribe(Flow.Subscription subscription) {
-        synchronized(parent) {
+    public synchronized void onSubscribe(Flow.Subscription subscription) {
+        synchronized (this) {
             if (this.subscription != null) {
                 subscription.cancel(); // this is dictated by the spec.
                 return;
@@ -100,7 +84,7 @@ public class InpFlow<T> extends CompletablePort implements Flow.Subscriber<T> {
      */
     @Override
     public void onNext(T message) {
-        synchronized(parent) {
+        synchronized(this) {
             if (message == null) {
                 throw new NullPointerException();
             }

@@ -2,7 +2,6 @@ package org.df4j.reactivestreamstck;
 
 import org.df4j.core.dataflow.Actor;
 import org.df4j.core.port.InpFlow;
-import org.df4j.core.util.Logger;
 import org.junit.Assert;
 
 import java.util.logging.Level;

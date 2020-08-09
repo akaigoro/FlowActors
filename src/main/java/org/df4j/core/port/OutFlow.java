@@ -7,7 +7,6 @@ import java.util.ArrayDeque;
 import java.util.Iterator;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Flow;
-import java.util.concurrent.TimeUnit;
 
 /**
  * A passive source of messages (like a server).
@@ -66,7 +65,44 @@ public class OutFlow<T> extends CompletablePort implements Flow.Publisher<T> {
      * @param token token to insert
      */
     public void onNext(T token) {
-        if (!offer(token)) {
+        boolean result = false;
+        boolean finished = false;
+        if (token == null) {
+            throw new NullPointerException();
+        }
+        FlowSubscriptionImpl sub;
+        synchronized(parent) {
+            if (!completed) {
+                sub = activeSubscribtions.poll();
+                if (sub == null) {
+                    if (_remainingCapacity() == 0) {
+                        finished = true;
+                    } else {
+                        tokens.add(token);
+                        hasItemsEvent();
+                        if (_remainingCapacity() == 0) {
+                            block();
+                        }
+                    }
+                } else {
+                    boolean subIsActive = sub.onNext(token);
+                    if (!sub.isCancelled()) {
+                        if (subIsActive) {
+                            activeSubscribtions.add(sub);
+                        } else {
+                            passiveSubscribtions.add(sub);
+                        }
+                    }
+                    if (_remainingCapacity() == 0 && activeSubscribtions.isEmpty()) {
+                        block();
+                    }
+                }
+                if (!finished) {
+                    result = true;
+                }
+            }
+        }
+        if (!result) {
             throw new IllegalStateException("buffer overflow");
         }
     }
@@ -74,47 +110,6 @@ public class OutFlow<T> extends CompletablePort implements Flow.Publisher<T> {
     public boolean isCompleted() {
         synchronized(parent) {
             return completed && tokens.size() == 0;
-        }
-    }
-
-    /**
-     *
-     * @param token token to insert
-     * @return true if token inserted
-     */
-    public boolean offer(T token) {
-        if (token == null) {
-            throw new NullPointerException();
-        }
-        FlowSubscriptionImpl sub;
-        synchronized(parent) {
-            if (completed) {
-                return false;
-            }
-            sub = activeSubscribtions.poll();
-            if (sub == null) {
-                if (_remainingCapacity() == 0) {
-                    return false;
-                }
-                tokens.add(token);
-                hasItemsEvent();
-                if (_remainingCapacity() == 0) {
-                    block();
-                }
-            } else {
-                boolean subIsActive = sub.onNext(token);
-                if (!sub.isCancelled()) {
-                    if (subIsActive) {
-                        activeSubscribtions.add(sub);
-                    } else {
-                        passiveSubscribtions.add(sub);
-                    }
-                }
-                if (_remainingCapacity() == 0 && activeSubscribtions.isEmpty()) {
-                    block();
-                }
-            }
-            return true;
         }
     }
 
@@ -168,48 +163,6 @@ public class OutFlow<T> extends CompletablePort implements Flow.Publisher<T> {
                 return null;
             }
         }
-    }
-
-    public T poll(long timeout, TimeUnit unit) throws InterruptedException {
-        synchronized(parent) {
-            long millis = unit.toMillis(timeout);
-            for (;;) {
-                T res = tokens.poll();
-                if (res != null) {
-                    unblock();
-                    return res;
-                }
-                if (completed) {
-                    throw new CompletionException(completionException);
-                }
-                if (millis <= 0) {
-                    return null;
-                }
-                long targetTime = System.currentTimeMillis() + millis;
-                parent.wait(millis);
-                millis = targetTime - System.currentTimeMillis();
-            }
-        }
-    }
-
-    public T take() throws InterruptedException {
-        synchronized(parent) {
-            for (;;) {
-                T res = tokens.poll();
-                if (res != null) {
-                    unblock();
-                    return res;
-                }
-                if (completed) {
-                    throw new CompletionException(completionException);
-                }
-                parent.wait();
-            }
-        }
-    }
-
-    public int size() {
-        return tokens.size();
     }
 
     protected class FlowSubscriptionImpl implements Flow.Subscription {
@@ -280,20 +233,16 @@ public class OutFlow<T> extends CompletablePort implements Flow.Publisher<T> {
         }
 
         @Override
-        public void cancel() {
+        public synchronized void cancel() {
+            if (cancelled) {
+                return;
+            }
+            cancelled = true;
             synchronized(parent) {
-                if (cancelled) {
-                    return;
-                }
-                cancelled = true;
                 if (remainedRequests > 0) {
-                    if (activeSubscribtions != null) {
-                        activeSubscribtions.remove(this);
-                    }
+                    activeSubscribtions.remove(this);
                 } else {
-                    if (passiveSubscribtions != null) {
-                        passiveSubscribtions.remove(this);
-                    }
+                    passiveSubscribtions.remove(this);
                 }
             }
         }
@@ -305,7 +254,7 @@ public class OutFlow<T> extends CompletablePort implements Flow.Publisher<T> {
          */
         private boolean onNext(T token) {
             subscriber.onNext(token);
-            synchronized(parent) {
+            synchronized(this) {
                 remainedRequests--;
                 return remainedRequests > 0;
             }
