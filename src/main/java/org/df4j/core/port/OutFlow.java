@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit;
  * Is ready when has room to store at least one toke
  * @param <T> type of emitted tokens
  */
-public class OutFlow<T> extends CompletablePort implements OutMessagePort<T>, Flow.Publisher<T> {
+public class OutFlow<T> extends CompletablePort implements Flow.Publisher<T> {
     public static final int DEFAULT_CAPACITY = 16;
     protected final int capacity;
     protected ArrayDeque<T> tokens;
@@ -65,7 +65,6 @@ public class OutFlow<T> extends CompletablePort implements OutMessagePort<T>, Fl
      *
      * @param token token to insert
      */
-    @Override
     public void onNext(T token) {
         if (!offer(token)) {
             throw new IllegalStateException("buffer overflow");

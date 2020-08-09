@@ -20,11 +20,6 @@ public enum ActorState {
     Running,
 
     /**
-     * suspended by call to {@link Actor#delay(long)} or  {@link Actor#suspend()}
-     */
-    Suspended,
-
-    /**
      * completed normally or exceptionally.
      * Will never run again.
      */

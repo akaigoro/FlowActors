@@ -1,10 +1,7 @@
 package org.df4j.core.dataflow;
 
-import org.df4j.core.port.OutFlow;
-import org.df4j.protocol.Completable;
-import org.df4j.protocol.SimpleSubscription;
-
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.*;
 
 import static org.df4j.core.dataflow.ActorState.*;
@@ -23,13 +20,8 @@ public abstract class Actor {
     private static final boolean checkingMode = true; // todo false
     protected ActorState state = Created;
     protected Throwable completionException;
-    protected LinkedList<CompletionSubscription> subscriptions = new LinkedList<>();
     protected boolean completed;
     private int activePortsScale = PORTS_ALL;
-    private volatile ThrowingRunnable nextAction;
-    private TimerTask task;
-    /** is not encountered as a parent's child */
-    private boolean daemon;
     /**
      * blocked initially, until {@link #start} called.
      */
@@ -38,79 +30,24 @@ public abstract class Actor {
     private ControlPort controlport = new ControlPort(this);
     private ExecutorService executor;
 
-    {nextAction(this::runAction);}
-
-    public static int makePortScale(Port... ports) {
-        int scale = 0;
-        for (Port port: ports) {
-            scale |= (1 << port.portNum);
-        }
-        return scale;
+    {
+        setActivePorts(PORTS_ALL);
     }
 
     protected void setActivePorts(int scale) {
         activePortsScale = PORTS_NONE | scale;
     }
 
-    protected void setActivePorts(Port... ports) {
-        setActivePorts(makePortScale(ports));
-    }
-
     protected int setUnBlocked(int portNum) {
         return (blockedPortsScale &= ~(1 << portNum)) & activePortsScale;
     }
 
-    public ThrowingRunnable getNextAction() {
-        return nextAction;
-    }
-
-    protected void nextAction(ThrowingRunnable tRunnable, int portScale) {
-        this.nextAction = tRunnable;
-        setActivePorts(portScale);
-    }
-
-    protected void nextAction(ThrowingRunnable tRunnable, Port... ports) {
-        nextAction(tRunnable, makePortScale(ports));
-    }
-
-    protected void nextAction(ThrowingRunnable tRunnable) {
-        nextAction(tRunnable, PORTS_ALL);
-    }
-
-    /**
-     * sets infinite delay. Previously set delay is canceled.
-     */
-    protected synchronized void suspend() {
-        if (state == Completed) {
-            return;
-        }
-        state = Suspended;
-    }
-
-    /**
-     * Moves this actor from {@link ActorState#Suspended} state to {@link ActorState#Blocked} or {@link ActorState#Running}.
-     * Ignored if current state is not {@link ActorState#Suspended}.
-     */
-    public  void resume() {
-        synchronized(this) {
-            if (state != Suspended) {
-                return;
-            }
-            if (this.task != null) {
-                this.task.cancel();
-                this.task = null;
-            }
-            _controlportUnblock();
-        }
-    }
-
     protected void run() {
         try {
-            nextAction.run();
+            runAction();
             synchronized (this) {
                 switch (state) {
                     case Completed:
-                    case Suspended:
                     return;
                 default:
                     _controlportUnblock();
@@ -125,23 +62,12 @@ public abstract class Actor {
         return state;
     }
 
-    public synchronized void setDaemon(boolean daemon) {
-        if (this.daemon) {
-            return;
-        }
-        this.daemon = daemon;
-    }
-
     private void setBlocked(int portNum) {
         blockedPortsScale |= (1<<portNum);
     }
 
     protected boolean isBlocked(int portNum) {
         return (blockedPortsScale & (1<<portNum)) != 0;
-    }
-
-    public synchronized boolean isDaemon() {
-        return daemon;
     }
 
     /**
@@ -225,14 +151,9 @@ public abstract class Actor {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append(super.toString());sb.append(" ");
-        LinkedList<CompletionSubscription> subscribers = this.subscriptions;
         Throwable completionException1 = this.completionException;
-        int size = 0;
-        if (subscribers!=null) {
-            size=subscribers.size();
-        }
         if (!completed) {
-            sb.append("not completed; subscribers: "+size);
+            sb.append("not completed");
         } else if (completionException1 == null) {
             sb.append("completed successfully");
         } else {
@@ -240,10 +161,6 @@ public abstract class Actor {
             sb.append(completionException1.toString());
         }
         return sb.toString() + "/"+state;
-    }
-
-    public String portsToString() {
-        return ports.toString();
     }
 
     public void setExecutor(ExecutorService executor) {
@@ -313,10 +230,6 @@ public abstract class Actor {
         return completionException;
     }
 
-    public LinkedList<CompletionSubscription> getSubscriptions() {
-        return subscriptions;
-    }
-
     public void setCompleted(boolean completed) {
         this.completed = completed;
     }
@@ -329,35 +242,7 @@ public abstract class Actor {
         return completed;
     }
 
-    public void subscribe(Completable.Observer co) {
-        synchronized(this) {
-            if (!completed) {
-                CompletionSubscription subscription = new CompletionSubscription(this, co);
-                subscriptions.add(subscription);
-                co.onSubscribe(subscription);
-                return;
-            }
-        }
-        if (getCompletionException() == null) {
-            co.onComplete();
-        } else {
-            Throwable completionException = getCompletionException();
-            co.onError(completionException);
-        }
-    }
-
-    protected void completeSubscriptions(LinkedList<CompletionSubscription> subs) {
-        for (;;) {
-            CompletionSubscription sub = subs.poll();
-            if (sub == null) {
-                break;
-            }
-            sub.onComplete();
-        }
-    }
-
     protected void _complete(Throwable e) {
-        LinkedList<CompletionSubscription> subs;
         synchronized(this) {
             if (completed) {
                 return;
@@ -365,13 +250,7 @@ public abstract class Actor {
             completed = true;
             this.completionException = e;
             notifyAll();
-            if (subscriptions == null) {
-                return;
-            }
-            subs = subscriptions;
-            subscriptions = null;
         }
-        completeSubscriptions(subs);
     }
 
     /**
@@ -511,51 +390,6 @@ public abstract class Actor {
     private static class ControlPort extends Port {
         ControlPort(Actor parent) {
             super(parent);
-        }
-    }
-
-    static protected class CompletionSubscription implements SimpleSubscription {
-        private final Actor completion;
-        Completable.Observer subscriber;
-        private boolean cancelled;
-
-        protected CompletionSubscription(Actor complention) {
-            this.completion = complention;
-        }
-
-        protected CompletionSubscription(Actor completion, Completable.Observer subscriber) {
-            this.completion = completion;
-            this.subscriber = subscriber;
-        }
-
-        @Override
-        public void cancel() {
-            synchronized(completion) {
-                if (cancelled) {
-                    return;
-                }
-                cancelled = true;
-                LinkedList<CompletionSubscription> subscriptions = completion.getSubscriptions();
-                if (subscriptions != null) {
-                    subscriptions.remove(this);
-                }
-            }
-        }
-
-        @Override
-        public boolean isCancelled() {
-            synchronized(completion) {
-                return cancelled;
-            }
-        }
-
-        void onComplete() {
-            Throwable completionException = completion.getCompletionException();
-            if (completionException == null) {
-                subscriber.onComplete();
-            } else {
-                subscriber.onError(completionException);
-            }
         }
     }
 
