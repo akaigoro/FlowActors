@@ -2,9 +2,7 @@ package org.df4j.core.port;
 
 import org.df4j.core.dataflow.Actor;
 
-import java.util.AbstractQueue;
 import java.util.ArrayDeque;
-import java.util.Iterator;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.Flow;
 
@@ -20,8 +18,8 @@ public class OutFlow<T> extends CompletablePort implements Flow.Publisher<T> {
     public static final int DEFAULT_CAPACITY = 16;
     protected final int capacity;
     protected ArrayDeque<T> tokens;
-    private LinkedQueue activeSubscribtions = new LinkedQueue();
-    private LinkedQueue passiveSubscribtions = new LinkedQueue();
+    private SubscriptionQueue activeSubscribtions = new SubscriptionQueue();
+    private SubscriptionQueue passiveSubscribtions = new SubscriptionQueue();
 
     public OutFlow(Actor parent, int capacity) {
         super(parent, capacity>0);
@@ -178,6 +176,25 @@ public class OutFlow<T> extends CompletablePort implements Flow.Publisher<T> {
             this.subscriber = subscriber;
         }
 
+        public FlowSubscriptionImpl getPrev() {
+            return prev;
+        }
+
+        public void setPrev(FlowSubscriptionImpl prev) {
+            this.prev = prev;
+        }
+
+        public boolean isLinked() {
+            return getNext() != this;
+        }
+
+        public void unlink() {
+            getPrev().setNext(this.getNext());
+            getNext().setPrev(this.getPrev());
+            this.setPrev(this);
+            this.setNext(this);
+        }
+
         public boolean isCancelled() {
             synchronized(parent) {
                 return cancelled;
@@ -285,57 +302,30 @@ public class OutFlow<T> extends CompletablePort implements Flow.Publisher<T> {
         public void setNext(FlowSubscriptionImpl next) {
             this.next = next;
         }
-
-        public FlowSubscriptionImpl getPrev() {
-            return prev;
-        }
-
-        public void setPrev(FlowSubscriptionImpl prev) {
-            this.prev = prev;
-        }
-
-        public boolean isLinked() {
-            return getNext() != this;
-        }
-
-        public void unlink() {
-            getPrev().setNext(this.getNext());
-            getNext().setPrev(this.getPrev());
-            this.setPrev(this);
-            this.setNext(this);
-        }
     }
 
-    public class LinkedQueue extends AbstractQueue<FlowSubscriptionImpl> {
+    public class SubscriptionQueue {
         private OutFlow.FlowSubscriptionImpl header = new OutFlow.FlowSubscriptionImpl();
         private int size = 0;
 
-        @Override
-        public Iterator<FlowSubscriptionImpl> iterator() {
-            return new LinkIterator();
+        public synchronized boolean isEmpty() {
+            return size == 0;
         }
 
-        @Override
-        public int size() {
-            return size;
-        }
-
-        @Override
-        public boolean offer(FlowSubscriptionImpl item) {
-            if (item == header) {
+        public synchronized boolean add(FlowSubscriptionImpl flowSubscription) {
+            if (flowSubscription == header) {
                 throw new IllegalArgumentException();
             }
-            item.setNext(header);
-            OutFlow.FlowSubscriptionImpl prev = header.getPrev();
-            item.setPrev(prev);
-            prev.setNext(item);
-            header.setPrev(item);
+            flowSubscription.setNext(header);
+            FlowSubscriptionImpl prev = header.getPrev();
+            flowSubscription.setPrev(prev);
+            prev.setNext(flowSubscription);
+            header.setPrev(flowSubscription);
             size++;
             return true;
         }
 
-        @Override
-        public FlowSubscriptionImpl poll() {
+        public synchronized FlowSubscriptionImpl poll() {
             if (size == 0) {
                 return null;
             }
@@ -348,57 +338,18 @@ public class OutFlow<T> extends CompletablePort implements Flow.Publisher<T> {
             }
             if (first == null) {
                 return  null;
-            }else {
+            } else {
                 return (FlowSubscriptionImpl)first;
             }
         }
 
-        @Override
-        public FlowSubscriptionImpl peek() {
-            OutFlow.FlowSubscriptionImpl next = header.getNext();
-            if (next == header) {
-                return null;
-            } else {
-                return (FlowSubscriptionImpl)next;
-            }
-        }
-
-        public boolean remove(OutFlow.FlowSubscriptionImpl subscription) {
+        public synchronized boolean remove(OutFlow.FlowSubscriptionImpl subscription) {
             if (subscription.isLinked()) {
                 subscription.unlink();
                 size--;
                 return true;
             } else {
                 return false;
-            }
-        }
-
-        private class LinkIterator implements Iterator<FlowSubscriptionImpl> {
-            OutFlow.FlowSubscriptionImpl current = header;
-            boolean hasnext;
-
-            @Override
-            public boolean hasNext() {
-                hasnext = current.getNext() != header;
-                return hasnext;
-            }
-
-            @Override
-            public FlowSubscriptionImpl next() {
-                if (!hasnext) {
-                    throw new IllegalStateException();
-                }
-                hasnext = false;
-                current = current.getNext();
-                return (FlowSubscriptionImpl)current;
-            }
-
-            @Override
-            public void remove() {
-                OutFlow.FlowSubscriptionImpl res = current;
-                current = res.getNext();
-                res.unlink();
-                hasnext = false;
             }
         }
     }
