@@ -1,7 +1,6 @@
 package org.df4j.reactivestreamstck;
 
 import org.df4j.core.dataflow.Actor;
-import org.df4j.core.dataflow.Dataflow;
 import org.df4j.core.port.InpFlow;
 import org.df4j.core.util.Logger;
 import org.junit.Assert;
@@ -13,11 +12,6 @@ public class SubscriberActor extends Actor {
     final int delay;
     public final InpFlow<Long> inp = new InpFlow<>(this, 1);
     Long cnt = null;
-
-    public SubscriberActor(Dataflow parent, int delay) {
-        super(parent);
-        this.delay = delay;
-    }
 
     public void setLogLevel(Level all) {
         logger.setLevel(all);

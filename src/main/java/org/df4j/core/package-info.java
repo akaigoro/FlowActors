@@ -20,7 +20,7 @@
  * - nodes are subclasses of abstract class {@link org.df4j.core.dataflow.AsyncProc}.
  * <p>
  * - ports may be of several predefined types, and user can create specific pin types
- * by subclassing class {@link org.df4j.core.dataflow.AsyncProc.Port}.
+ * by subclassing class {@link org.df4j.core.dataflow.Actor.Port}.
  *
  */
 

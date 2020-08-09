@@ -1,8 +1,8 @@
 package org.df4j.core.port;
 
-import org.df4j.core.dataflow.AsyncProc;
+import org.df4j.core.dataflow.Actor;
 
-public class CompletablePort extends AsyncProc.Port {
+public class CompletablePort extends Actor.Port {
     protected volatile boolean completed = false;
     protected Throwable completionException = null;
 
@@ -10,11 +10,11 @@ public class CompletablePort extends AsyncProc.Port {
      * @param parent {@link AsyncProc} to which this port belongs
      * @param ready initial port state - port is not blocking the actor's execution
      */
-    public CompletablePort(AsyncProc parent, boolean ready) {
+    public CompletablePort(Actor parent, boolean ready) {
         super(parent, ready);
     }
 
-    public CompletablePort(AsyncProc parent) {
+    public CompletablePort(Actor parent) {
         super(parent, false);
     }
 

@@ -1,14 +1,12 @@
 package org.df4j.core.port;
 
-import org.df4j.core.dataflow.AsyncProc;
-import org.df4j.core.util.linked.LinkImpl;
-import org.df4j.core.util.linked.LinkedQueue;
-import org.df4j.protocol.Flow;
-import org.df4j.protocol.FlowSubscription;
-import org.reactivestreams.Subscriber;
+import org.df4j.core.dataflow.Actor;
 
+import java.util.AbstractQueue;
 import java.util.ArrayDeque;
+import java.util.Iterator;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.Flow;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -23,10 +21,10 @@ public class OutFlow<T> extends CompletablePort implements OutMessagePort<T>, Fl
     public static final int DEFAULT_CAPACITY = 16;
     protected final int capacity;
     protected ArrayDeque<T> tokens;
-    private LinkedQueue<FlowSubscriptionImpl> activeSubscribtions = new LinkedQueue<>();
-    private LinkedQueue<FlowSubscriptionImpl> passiveSubscribtions = new LinkedQueue<>();
+    private LinkedQueue activeSubscribtions = new LinkedQueue();
+    private LinkedQueue passiveSubscribtions = new LinkedQueue();
 
-    public OutFlow(AsyncProc parent, int capacity) {
+    public OutFlow(Actor parent, int capacity) {
         super(parent, capacity>0);
         if (capacity < 0) {
             throw new IllegalArgumentException();
@@ -35,12 +33,12 @@ public class OutFlow<T> extends CompletablePort implements OutMessagePort<T>, Fl
         tokens = new ArrayDeque<>(capacity);
     }
 
-    public OutFlow(AsyncProc parent) {
+    public OutFlow(Actor parent) {
         this(parent, DEFAULT_CAPACITY);
     }
 
     @Override
-    public void subscribe(Subscriber<? super T> subscriber) {
+    public void subscribe(Flow.Subscriber<? super T> subscriber) {
         FlowSubscriptionImpl subscription = new FlowSubscriptionImpl(subscriber);
         synchronized(parent) {
             if (passiveSubscribtions != null) {
@@ -215,16 +213,19 @@ public class OutFlow<T> extends CompletablePort implements OutMessagePort<T>, Fl
         return tokens.size();
     }
 
-    protected class FlowSubscriptionImpl extends LinkImpl implements FlowSubscription {
-        protected final Subscriber subscriber;
+    protected class FlowSubscriptionImpl implements Flow.Subscription {
+        protected Flow.Subscriber subscriber;
         private long remainedRequests = 0;
         private boolean cancelled = false;
+        private FlowSubscriptionImpl prev = this;
+        private FlowSubscriptionImpl next = this;
 
-        FlowSubscriptionImpl(Subscriber subscriber) {
+        FlowSubscriptionImpl() { }
+
+        FlowSubscriptionImpl(Flow.Subscriber subscriber) {
             this.subscriber = subscriber;
         }
 
-        @Override
         public boolean isCancelled() {
             synchronized(parent) {
                 return cancelled;
@@ -326,6 +327,130 @@ public class OutFlow<T> extends CompletablePort implements OutMessagePort<T>, Fl
                 subscriber.onComplete();
             } else {
                 subscriber.onError(completionException);
+            }
+        }
+
+        public FlowSubscriptionImpl getNext() {
+            return next;
+        }
+
+        public void setNext(FlowSubscriptionImpl next) {
+            this.next = next;
+        }
+
+        public FlowSubscriptionImpl getPrev() {
+            return prev;
+        }
+
+        public void setPrev(FlowSubscriptionImpl prev) {
+            this.prev = prev;
+        }
+
+        public boolean isLinked() {
+            return getNext() != this;
+        }
+
+        public void unlink() {
+            getPrev().setNext(this.getNext());
+            getNext().setPrev(this.getPrev());
+            this.setPrev(this);
+            this.setNext(this);
+        }
+    }
+
+    public class LinkedQueue extends AbstractQueue<FlowSubscriptionImpl> {
+        private OutFlow.FlowSubscriptionImpl header = new OutFlow.FlowSubscriptionImpl();
+        private int size = 0;
+
+        @Override
+        public Iterator<FlowSubscriptionImpl> iterator() {
+            return new LinkIterator();
+        }
+
+        @Override
+        public int size() {
+            return size;
+        }
+
+        @Override
+        public boolean offer(FlowSubscriptionImpl item) {
+            if (item == header) {
+                throw new IllegalArgumentException();
+            }
+            item.setNext(header);
+            OutFlow.FlowSubscriptionImpl prev = header.getPrev();
+            item.setPrev(prev);
+            prev.setNext(item);
+            header.setPrev(item);
+            size++;
+            return true;
+        }
+
+        @Override
+        public FlowSubscriptionImpl poll() {
+            if (size == 0) {
+                return null;
+            }
+            size--;
+            OutFlow.FlowSubscriptionImpl first = null;
+            OutFlow.FlowSubscriptionImpl res = header.getNext();
+            if (res != header) {
+                res.unlink();
+                first = res;
+            }
+            if (first == null) {
+                return  null;
+            }else {
+                return (FlowSubscriptionImpl)first;
+            }
+        }
+
+        @Override
+        public FlowSubscriptionImpl peek() {
+            OutFlow.FlowSubscriptionImpl next = header.getNext();
+            if (next == header) {
+                return null;
+            } else {
+                return (FlowSubscriptionImpl)next;
+            }
+        }
+
+        public boolean remove(OutFlow.FlowSubscriptionImpl subscription) {
+            if (subscription.isLinked()) {
+                subscription.unlink();
+                size--;
+                return true;
+            } else {
+                return false;
+            }
+        }
+
+        private class LinkIterator implements Iterator<FlowSubscriptionImpl> {
+            OutFlow.FlowSubscriptionImpl current = header;
+            boolean hasnext;
+
+            @Override
+            public boolean hasNext() {
+                hasnext = current.getNext() != header;
+                return hasnext;
+            }
+
+            @Override
+            public FlowSubscriptionImpl next() {
+                if (!hasnext) {
+                    throw new IllegalStateException();
+                }
+                hasnext = false;
+                current = current.getNext();
+                return (FlowSubscriptionImpl)current;
+            }
+
+            @Override
+            public void remove() {
+                OutFlow.FlowSubscriptionImpl res = current;
+                current = res.getNext();
+                res.unlink();
+                hasnext = false;
             }
         }
     }

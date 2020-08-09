@@ -1,21 +1,20 @@
 package org.df4j.core.port;
 
-import org.df4j.core.dataflow.AsyncProc;
-import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
+import org.df4j.core.dataflow.Actor;
 
 import java.util.ArrayDeque;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.Flow;
 
 /**
  * Token storage with standard Subscriber&lt;T&gt; interface.
  *
  * @param <T> type of accepted tokens.
  */
-public class InpFlow<T> extends CompletablePort implements InpMessagePort<T>, Subscriber<T> {
+public class InpFlow<T> extends CompletablePort implements Flow.Subscriber<T> {
     private int bufferCapacity;
     private ArrayDeque<T> tokens;
-    protected Subscription subscription;
+    protected Flow.Subscription subscription;
     private long requestedCount;
 
     /**
@@ -23,7 +22,7 @@ public class InpFlow<T> extends CompletablePort implements InpMessagePort<T>, Su
      * @param parent {@link AsyncProc} to wich this port belongs
      * @param capacity required capacity
      */
-    public InpFlow(AsyncProc parent, int capacity) {
+    public InpFlow(Actor parent, int capacity) {
         super(parent);
         setCapacity(capacity);
     }
@@ -31,7 +30,7 @@ public class InpFlow<T> extends CompletablePort implements InpMessagePort<T>, Su
     /**
      * @param parent {@link AsyncProc} to which this port belongs
      */
-    public InpFlow(AsyncProc parent) {
+    public InpFlow(Actor parent) {
         this(parent, 1);
     }
 
@@ -74,7 +73,7 @@ public class InpFlow<T> extends CompletablePort implements InpMessagePort<T>, Su
     }
 
     @Override
-    public void onSubscribe(Subscription subscription) {
+    public void onSubscribe(Flow.Subscription subscription) {
         synchronized(parent) {
             if (this.subscription != null) {
                 subscription.cancel(); // this is dictated by the spec.
@@ -137,7 +136,6 @@ public class InpFlow<T> extends CompletablePort implements InpMessagePort<T>, Su
         return res;
     }
 
-    @Override
     public T remove() throws CompletionException {
         if (isCompleted()) {
             throw new java.util.concurrent.CompletionException(completionException);

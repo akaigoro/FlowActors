@@ -1,17 +1,14 @@
 package org.df4j.reactivestreamstck;
 
 import org.df4j.core.dataflow.Actor;
-import org.df4j.core.dataflow.Dataflow;
 import org.df4j.core.port.OutFlow;
 import org.df4j.core.util.Logger;
-import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
 import org.reactivestreams.tck.TestEnvironment;
 
+import java.util.concurrent.Flow;
 import java.util.logging.Level;
 
-public class PublisherVerificationTest extends org.reactivestreams.tck.PublisherVerification<Long> {
+public class PublisherVerificationTest extends org.reactivestreams.tck.flow.FlowPublisherVerification<Long> {
     static final long defaultTimeout = 400;
 
     public PublisherVerificationTest() {
@@ -19,14 +16,14 @@ public class PublisherVerificationTest extends org.reactivestreams.tck.Publisher
     }
 
     @Override
-    public Publisher<Long> createPublisher(long elements) {
+    public Flow.Publisher<Long> createFlowPublisher(long elements) {
         LoggingPublisherActor publisher = new LoggingPublisherActor(elements);
         publisher.start();
         return publisher;
     }
 
     @Override
-    public Publisher<Long> createFailedPublisher() {
+    public Flow.Publisher<Long> createFailedFlowPublisher() {
         MyPublisherActor publisher = new MyPublisherActor();
         publisher.start();
         return publisher.out;
@@ -37,7 +34,7 @@ public class PublisherVerificationTest extends org.reactivestreams.tck.Publisher
         super.stochastic_spec103_mustSignalOnMethodsSequentially();
     }
 
-    static class LoggingPublisherActor extends Actor implements Publisher<Long> {
+    static class LoggingPublisherActor extends Actor implements Flow.Publisher<Long> {
         protected final Logger logger = new Logger(this);
         final int delay;
         public OutFlow<Long> out;
@@ -53,15 +50,10 @@ public class PublisherVerificationTest extends org.reactivestreams.tck.Publisher
         }
 
         public LoggingPublisherActor(long cnt, int delay) {
-            this(new Dataflow(), cnt, delay);
+            this(cnt, delay, OutFlow.DEFAULT_CAPACITY);
         }
 
-        public LoggingPublisherActor(Dataflow parent, long cnt, int delay) {
-            this(parent, cnt, delay, OutFlow.DEFAULT_CAPACITY);
-        }
-
-        public LoggingPublisherActor(Dataflow parent, long cnt, int delay, int capacity) {
-            super(parent);
+        public LoggingPublisherActor(long cnt, int delay, int capacity) {
             out = new OutFlow<>(this, capacity);
             this.cnt = cnt;
             this.delay = delay;
@@ -69,7 +61,7 @@ public class PublisherVerificationTest extends org.reactivestreams.tck.Publisher
         }
 
         @Override
-        public void subscribe(Subscriber<? super Long> s) {
+        public void subscribe(Flow.Subscriber<? super Long> s) {
             logger.info("PublisherActor.subscribe:");
             out.subscribe(new ProxySubscriber(s));
         }
@@ -92,10 +84,10 @@ public class PublisherVerificationTest extends org.reactivestreams.tck.Publisher
             }
         }
 
-        private class ProxySubscription implements Subscription {
-            private org.reactivestreams.Subscription subscription;
+        private class ProxySubscription implements Flow.Subscription {
+            private Flow.Subscription subscription;
 
-            public ProxySubscription(org.reactivestreams.Subscription subscription) {
+            public ProxySubscription(Flow.Subscription subscription) {
                 this.subscription = subscription;
             }
 
@@ -112,15 +104,15 @@ public class PublisherVerificationTest extends org.reactivestreams.tck.Publisher
             }
         }
 
-        class ProxySubscriber implements Subscriber<Long> {
-            private final Subscriber<? super Long> sub;
+        class ProxySubscriber implements Flow.Subscriber<Long> {
+            private final Flow.Subscriber<? super Long> sub;
 
-            public ProxySubscriber(Subscriber<? super Long> s) {
+            public ProxySubscriber(Flow.Subscriber<? super Long> s) {
                 sub = s;
             }
 
             @Override
-            public void onSubscribe(org.reactivestreams.Subscription subscription) {
+            public void onSubscribe(Flow.Subscription subscription) {
                 logger.info("        Subscriber.onSubscribe");
                 ProxySubscription proxy = new ProxySubscription(subscription);
                 sub.onSubscribe(proxy);
