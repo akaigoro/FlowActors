@@ -1,4 +1,4 @@
-package org.df4j.reactivestreamstck;
+package org.df4j.core.util;
 
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;

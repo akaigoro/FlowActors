@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.*;
 
-import static org.df4j.core.dataflow.Actor.ActorState.*;
+import static org.df4j.core.dataflow.ActorState.*;
 
 /**
  * {@link Actor} is an {@link Actor} whose {@link Actor#runAction()} method can be executed repeatedly,
@@ -344,12 +344,12 @@ public abstract class Actor {
         /**
          * sets this port to a blocked state.
          */
-        public synchronized void block() {
-            if (!ready) {
-                return;
-            }
-            ready = false;
+        public void block() {
             synchronized(parent) {
+                if (!ready) {
+                    return;
+                }
+                ready = false;
                 if (parent.isCompleted()) {
                     return;
                 }
@@ -363,11 +363,11 @@ public abstract class Actor {
          * this block is submitted to the executor.
          */
         public synchronized void unblock() {
-            if (ready) {
-                return;
-            }
-            ready = true;
             synchronized(parent) {
+                if (ready) {
+                    return;
+                }
+                ready = true;
                 if (parent.isCompleted()) {
                     return;
                 }
@@ -393,29 +393,4 @@ public abstract class Actor {
         }
     }
 
-    /**
-     * applicable to {@link AsyncProc} also.
-     */
-    public enum ActorState {
-        /**
-         * created but not yet started
-         */
-        Created,
-
-        /**
-         *  started but some ports are blocked
-         */
-        Blocked,
-
-        /**
-         * started and all port are ready
-         */
-        Running,
-
-        /**
-         * completed normally or exceptionally.
-         * Will never run again.
-         */
-        Completed,
-    }
 }

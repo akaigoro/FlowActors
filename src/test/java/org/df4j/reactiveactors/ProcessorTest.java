@@ -14,7 +14,7 @@ public class ProcessorTest {
         prod.start();
         proc.start();
         cons.start();
-        cons.join(Math.max(delay1, delay2)*cnt+400);
+        cons.join(Math.max(delay1, delay2)*cnt+4000000);
         boolean completed = cons.isCompleted();
         Assert.assertTrue(completed);
     }

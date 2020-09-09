@@ -20,12 +20,6 @@ public abstract class AbstractActor {
      */
     private Port controlPort = new Port();
 
-    protected AbstractActor() {
-        init();
-    }
-
-    protected void init() {}
-
     public synchronized void start() {
         if (state != State.CREATED) {
             throw new IllegalStateException();

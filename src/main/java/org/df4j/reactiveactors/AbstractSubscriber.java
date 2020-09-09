@@ -4,14 +4,10 @@ import org.reactivestreams.Subscriber;
 
 public abstract class AbstractSubscriber<T> extends AbstractActor implements Subscriber<T> {
 
-    public InPort<T> inPort;
-
-    protected void init() {
-        inPort = new ReactiveInPort<>();
-    }
+    public ReactiveInPort<T> inPort = new ReactiveInPort<>();
 
     public ReactiveInPort<T> getInPort() {
-        return (ReactiveInPort<T>) inPort;
+        return inPort;
     }
 
     @Override
