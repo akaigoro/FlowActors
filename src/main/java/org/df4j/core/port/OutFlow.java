@@ -164,11 +164,11 @@ public class OutFlow<T> extends CompletablePort implements Flow.Publisher<T> {
     }
 
     protected class FlowSubscriptionImpl implements Flow.Subscription {
+        private FlowSubscriptionImpl prev = this;
+        private FlowSubscriptionImpl next = this;
         protected Flow.Subscriber subscriber;
         private long remainedRequests = 0;
         private boolean cancelled = false;
-        private FlowSubscriptionImpl prev = this;
-        private FlowSubscriptionImpl next = this;
 
         FlowSubscriptionImpl() { }
 

@@ -63,7 +63,7 @@ public class PublisherVerificationTest extends org.reactivestreams.tck.flow.Flow
         @Override
         public void subscribe(Flow.Subscriber<? super Long> s) {
             logger.info("PublisherActor.subscribe:");
-            out.subscribe(new ProxySubscriber(s));
+            out.subscribe(s);
         }
 
         public void setLogLevel(Level off) {
@@ -81,60 +81,6 @@ public class PublisherVerificationTest extends org.reactivestreams.tck.flow.Flow
                 logger.info("PublisherActor.onComplete");
                 out.onComplete();
                 complete();
-            }
-        }
-
-        private class ProxySubscription implements Flow.Subscription {
-            private Flow.Subscription subscription;
-
-            public ProxySubscription(Flow.Subscription subscription) {
-                this.subscription = subscription;
-            }
-
-            @Override
-            public void request(long n) {
-                logger.info("    Subscription.request:"+n);
-                subscription.request(n);
-            }
-
-            @Override
-            public void cancel() {
-                logger.info("    Subscription.cancel:");
-                subscription.cancel();
-            }
-        }
-
-        class ProxySubscriber implements Flow.Subscriber<Long> {
-            private final Flow.Subscriber<? super Long> sub;
-
-            public ProxySubscriber(Flow.Subscriber<? super Long> s) {
-                sub = s;
-            }
-
-            @Override
-            public void onSubscribe(Flow.Subscription subscription) {
-                logger.info("        Subscriber.onSubscribe");
-                ProxySubscription proxy = new ProxySubscription(subscription);
-                sub.onSubscribe(proxy);
-            }
-
-            @Override
-            public void onError(Throwable t) {
-                logger.info("        Subscriber.onError:"+t);
-                sub.onError(t);
-            }
-
-            @Override
-            public void onComplete() {
-                logger.info("        Subscriber.onComplete");
-//                new Exception().printStackTrace();
-                sub.onComplete();
-            }
-
-            @Override
-            public void onNext(Long t) {
-                logger.info("        Subscriber.onNext:"+t);
-                sub.onNext(t);
             }
         }
     }
